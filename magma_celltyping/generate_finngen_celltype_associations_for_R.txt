@@ -1,0 +1,520 @@
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_CHRONLARGE.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 434250,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_CHRONNAS.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 434744,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_CHRONOTH.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 434933,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_ANKYLOGLOSSIA.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 453733,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_APVR.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 453733,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_ASD.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 449747,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_CLEFT_AND_CARIES.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 453733,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_CLEFT_HARD_PALATE_NOS.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 453074,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_CLEFT_LIP_CLEFT_PALATE.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 453733,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_CLEFT_LIP_OR_LIP_AND_PALATE.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 453074,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_CLEFT_PALATE.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 453539,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_CONGEN_DEFORMITI_FEET.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 451335,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_CONGEN_LENS_MALFO.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 451518,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_CONGEN_MALFO_ANTER_SEGMENT_EYE.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 451621,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_CONGEN_MALFO_CIRCULATO_SYSTEM.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 453733,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_CONGEN_MALFO_DEFORMAT_MUSCULOS_SYSTEM.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 453733,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_CONGEN_MALFO_EAR_CAUSI_IMPAIRM_HEARING.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 451480,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_CONGEN_MALFO_GALLB_BILE_DUCTS_LIVER.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 452554,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_CONGEN_MALFO_GENITAL_ORGANS.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 453733,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_CONGEN_MALFO_GREAT_ARTERIES.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 449138,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_CONGEN_MALFO_GREAT_VEINS.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 448543,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_CONGEN_MALFO_NERVOUS_SYSTEM.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 453733,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_CONGEN_MALFO_OVARIES_FALLOP_TUBES_BROAD_LIGAM.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 253663,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_CONGEN_MALFO_POSTERI_SEGMENT_EYE.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 451518,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_CONGEN_MALFO_PULMONARY_TRICU_VALVES.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 448693,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_CONGEN_MALFO_RETI.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 451442,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_CONGEN_MALFO_TRACHEA_BRONCHUS.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 453484,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_CONGEN_MALFO_URINARY_SYSTEM.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 453733,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_CONOTR_DEFEC.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 453733,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_CYSTIC_KIDNEY_DISEA.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 452843,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_LVOTO_BROAD.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 453733,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_LVOTO_NARROW.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 453733,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_OSTEOCHONDROD_W_DEFECTS_GROWTH_TUBULAR_BONES_SPINE.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 450566,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_OTHER_CHROMOSOME_ABNORMALITI_NOT_ELSEW_CLASSIFIED.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 453278,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_OTHER_CONGEN_MALFO.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 453733,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_OTHER_CONGEN_MALFO_BRAIN.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 453157,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_OTHER_CONGEN_MALFO_CIRCULATO_SYSTEM.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 449240,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_OTHER_CONGEN_MALFO_DIGES_SYSTEM1.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 453733,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_OTHER_CONGEN_MALFO_DIGES_SYSTEM2.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 452357,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_OTHER_CONGEN_MALFO_EAR.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 451803,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_OTHER_CONGEN_MALFO_FACE_NECK.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 452348,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_OTHER_CONGEN_MALFO_FEMALE_GENITALIA.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 450456,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_OTHER_CONGEN_MALFO_HEART.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 448657,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_OTHER_CONGEN_MALFO_INTESTINE.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 452555,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_OTHER_CONGEN_MALFO_KIDNEY.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 451936,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_OTHER_CONGEN_MALFO_LIMBS.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 450750,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_OTHER_CONGEN_MALFO_MALE_GENITAL_ORGANS.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 450370,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_OTHER_CONGEN_MALFO_NERVOUS_SYSTEM.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 453326,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_OTHER_CONGEN_MALFO_NOT_ELSEW_CLASSIFIED.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 450857,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_OTHER_CONGEN_MALFO_PERIP_VASCULAR_SYSTEM.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 448862,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_OTHER_CONGEN_MALFO_RESPI_SYSTEM.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 453246,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_OTHER_CONGEN_MALFO_SKIN.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 451959,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_OTHER_CONGEN_MALFO_SKULL_FACE_BONES.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 450601,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_OTHER_CONGEN_MALFO_TONGUE_MOUTH_PHARYNX.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 452740,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_OTHER_CONGEN_MALFO_UPPER_ALIME_TRACT.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 452503,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_OTHER_CONGEN_MALFO_URINARY_SYSTEM.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 451965,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_OTHER_OSTEOCHONDROD.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 450779,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_OTHER_SPECIFE_CONGEN_MALFO_SYNDR_AFFECTING_MULTIPLE_SYSTEMS.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 451126,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_PHAKOMATOSES_NOT_ELSEW_CLASSIFIED.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 450945,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_RVOTO.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 453733,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_SEPTA_DEFEC.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 453733,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_Q17_UNDES_TESTICLE.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 450490,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_RX_CROHN_1STLINE.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 453733,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_RX_CROHN_2NDLINE.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 453733,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/finngen_R11_SLE_FG.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 339484,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )

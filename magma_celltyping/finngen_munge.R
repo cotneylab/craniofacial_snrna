@@ -1,0 +1,1733 @@
+#Prepare GWAS sumstats files
+#get summary file from FINNGEN
+#focus on congenital studies
+#grep "XVII Congenital" finngen_R11_manifest.tsv | cut -f1 > congenital_studies.txt
+#get other controls
+# grep "Crohn's" finngen_R11_manifest.tsv | cut -f1 > immune_studies.txt
+#get lupus
+# grep "SLE_FG" finngen_R11_manifest.tsv | cut -f1 >> immune_studies.txt
+#retrieve appropriate studies
+#grep -f congenital_studies.txt finngen_R11_manifest.tsv | cut -f7 | awk '{print "wget "$1}' > retrieve_studies.sh
+#grep -f immune_studies.txt finngen_R11_manifest.tsv | cut -f7 | awk '{print "wget "$1}' >> retrieve_studies.sh
+#run ./retrieve_studies.sh
+library(MungeSumstats)
+#need to set max memory size when in RStudio
+Sys.setenv('R_MAX_VSIZE'=64000000000)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_ANKYLOGLOSSIA.gz",
+  save_path = "finngen_R11_Q17_ANKYLOGLOSSIA.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_ANKYLOGLOSSIA.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_APVR.gz",
+  save_path = "finngen_R11_Q17_APVR.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_APVR.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_ASD.gz",
+  save_path = "finngen_R11_Q17_ASD.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_ASD.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_AVSD.gz",
+  save_path = "finngen_R11_Q17_AVSD.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_AVSD.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CHROMOSOMAL_ABNORMALITI_NOT_ELSEW_CLASSIFIED.gz",
+  save_path = "finngen_R11_Q17_CHROMOSOMAL_ABNORMALITI_NOT_ELSEW_CLASSIFIED.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CHROMOSOMAL_ABNORMALITI_NOT_ELSEW_CLASSIFIED.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CLEFT_AND_CARIES.gz",
+  save_path = "finngen_R11_Q17_CLEFT_AND_CARIES.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CLEFT_AND_CARIES.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CLEFT_HARD_PALATE_NOS.gz",
+  save_path = "finngen_R11_Q17_CLEFT_HARD_PALATE_NOS.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CLEFT_HARD_PALATE_NOS.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CLEFT_LIP.gz",
+  save_path = "finngen_R11_Q17_CLEFT_LIP.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CLEFT_LIP.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CLEFT_LIP_CLEFT_PALATE.gz",
+  save_path = "finngen_R11_Q17_CLEFT_LIP_CLEFT_PALATE.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CLEFT_LIP_CLEFT_PALATE.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CLEFT_LIP_OR_LIP_AND_PALATE.gz",
+  save_path = "finngen_R11_Q17_CLEFT_LIP_OR_LIP_AND_PALATE.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CLEFT_LIP_OR_LIP_AND_PALATE.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CLEFT_PALATE.gz",
+  save_path = "finngen_R11_Q17_CLEFT_PALATE.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CLEFT_PALATE.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_COMPLEX_CARD_DEFEC.gz",
+  save_path = "finngen_R11_Q17_COMPLEX_CARD_DEFEC.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_COMPLEX_CARD_DEFEC.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_DEFORMITI_FEET.gz",
+  save_path = "finngen_R11_Q17_CONGEN_DEFORMITI_FEET.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_DEFORMITI_FEET.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_DEFORMITI_HIP.gz",
+  save_path = "finngen_R11_Q17_CONGEN_DEFORMITI_HIP.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_DEFORMITI_HIP.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_ICHTHYOSIS.gz",
+  save_path = "finngen_R11_Q17_CONGEN_ICHTHYOSIS.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_ICHTHYOSIS.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_LENS_MALFO.gz",
+  save_path = "finngen_R11_Q17_CONGEN_LENS_MALFO.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_LENS_MALFO.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_MALFO_ANTER_SEGMENT_EYE.gz",
+  save_path = "finngen_R11_Q17_CONGEN_MALFO_ANTER_SEGMENT_EYE.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_MALFO_ANTER_SEGMENT_EYE.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_MALFO_BILI.gz",
+  save_path = "finngen_R11_Q17_CONGEN_MALFO_BILI.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_MALFO_BILI.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_MALFO_BREAST.gz",
+  save_path = "finngen_R11_Q17_CONGEN_MALFO_BREAST.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_MALFO_BREAST.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_MALFO_CARDIAC_CHAMB_CONNECTIO.gz",
+  save_path = "finngen_R11_Q17_CONGEN_MALFO_CARDIAC_CHAMB_CONNECTIO.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_MALFO_CARDIAC_CHAMB_CONNECTIO.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_MALFO_CIRCULATO_SYSTEM.gz",
+  save_path = "finngen_R11_Q17_CONGEN_MALFO_CIRCULATO_SYSTEM.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_MALFO_CIRCULATO_SYSTEM.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_MALFO_DEFORMAT_MUSCULOS_SYSTEM.gz",
+  save_path = "finngen_R11_Q17_CONGEN_MALFO_DEFORMAT_MUSCULOS_SYSTEM.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_MALFO_DEFORMAT_MUSCULOS_SYSTEM.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_MALFO_EAR_CAUSI_IMPAIRM_HEARING.gz",
+  save_path = "finngen_R11_Q17_CONGEN_MALFO_EAR_CAUSI_IMPAIRM_HEARING.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_MALFO_EAR_CAUSI_IMPAIRM_HEARING.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_MALFO_EYELID_LACRIMAL_APPARA_ORBIT.gz",
+  save_path = "finngen_R11_Q17_CONGEN_MALFO_EYELID_LACRIMAL_APPARA_ORBIT.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_MALFO_EYELID_LACRIMAL_APPARA_ORBIT.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_MALFO_EYE_EAR_FACE_NECK.gz",
+  save_path = "finngen_R11_Q17_CONGEN_MALFO_EYE_EAR_FACE_NECK.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_MALFO_EYE_EAR_FACE_NECK.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_MALFO_GALLB_BILE_DUCTS_LIVER.gz",
+  save_path = "finngen_R11_Q17_CONGEN_MALFO_GALLB_BILE_DUCTS_LIVER.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_MALFO_GALLB_BILE_DUCTS_LIVER.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_MALFO_GENITAL_ORGANS.gz",
+  save_path = "finngen_R11_Q17_CONGEN_MALFO_GENITAL_ORGANS.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_MALFO_GENITAL_ORGANS.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_MALFO_GREAT_ARTERIES.gz",
+  save_path = "finngen_R11_Q17_CONGEN_MALFO_GREAT_ARTERIES.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_MALFO_GREAT_ARTERIES.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_MALFO_GREAT_VEINS.gz",
+  save_path = "finngen_R11_Q17_CONGEN_MALFO_GREAT_VEINS.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_MALFO_GREAT_VEINS.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_MALFO_LARYNX.gz",
+  save_path = "finngen_R11_Q17_CONGEN_MALFO_LARYNX.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_MALFO_LARYNX.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_MALFO_LUNG.gz",
+  save_path = "finngen_R11_Q17_CONGEN_MALFO_LUNG.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_MALFO_LUNG.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_MALFO_MUSCULOS_SYSTEM_NOT_ELSEW_CLASSIFIED.gz",
+  save_path = "finngen_R11_Q17_CONGEN_MALFO_MUSCULOS_SYSTEM_NOT_ELSEW_CLASSIFIED.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_MALFO_MUSCULOS_SYSTEM_NOT_ELSEW_CLASSIFIED.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_MALFO_NERVOUS_SYSTEM.gz",
+  save_path = "finngen_R11_Q17_CONGEN_MALFO_NERVOUS_SYSTEM.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_MALFO_NERVOUS_SYSTEM.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_MALFO_NOSE.gz",
+  save_path = "finngen_R11_Q17_CONGEN_MALFO_NOSE.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_MALFO_NOSE.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_MALFO_OESOPHAGUS.gz",
+  save_path = "finngen_R11_Q17_CONGEN_MALFO_OESOPHAGUS.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_MALFO_OESOPHAGUS.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_MALFO_OVARIES_FALLOP_TUBES_BROAD_LIGAM.gz",
+  save_path = "finngen_R11_Q17_CONGEN_MALFO_OVARIES_FALLOP_TUBES_BROAD_LIGAM.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_MALFO_OVARIES_FALLOP_TUBES_BROAD_LIGAM.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_MALFO_POSTERI_SEGMENT_EYE.gz",
+  save_path = "finngen_R11_Q17_CONGEN_MALFO_POSTERI_SEGMENT_EYE.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_MALFO_POSTERI_SEGMENT_EYE.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_MALFO_PULMONARY_TRICU_VALVES.gz",
+  save_path = "finngen_R11_Q17_CONGEN_MALFO_PULMONARY_TRICU_VALVES.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_MALFO_PULMONARY_TRICU_VALVES.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_MALFO_RESPI_SYSTEM.gz",
+  save_path = "finngen_R11_Q17_CONGEN_MALFO_RESPI_SYSTEM.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_MALFO_RESPI_SYSTEM.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_MALFO_RETI.gz",
+  save_path = "finngen_R11_Q17_CONGEN_MALFO_RETI.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_MALFO_RETI.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_MALFO_SPINE_BONY_THORAX.gz",
+  save_path = "finngen_R11_Q17_CONGEN_MALFO_SPINE_BONY_THORAX.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_MALFO_SPINE_BONY_THORAX.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_MALFO_TRACHEA_BRONCHUS.gz",
+  save_path = "finngen_R11_Q17_CONGEN_MALFO_TRACHEA_BRONCHUS.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_MALFO_TRACHEA_BRONCHUS.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_MALFO_URINARY_SYSTEM.gz",
+  save_path = "finngen_R11_Q17_CONGEN_MALFO_URINARY_SYSTEM.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_MALFO_URINARY_SYSTEM.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_MALFO_UTERUS_CERVIX.gz",
+  save_path = "finngen_R11_Q17_CONGEN_MALFO_UTERUS_CERVIX.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_MALFO_UTERUS_CERVIX.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_MUSCULOS_DEFORMITI_HEAD_FACE_SPINE_CHEST.gz",
+  save_path = "finngen_R11_Q17_CONGEN_MUSCULOS_DEFORMITI_HEAD_FACE_SPINE_CHEST.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_MUSCULOS_DEFORMITI_HEAD_FACE_SPINE_CHEST.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONGEN_OBSTRUCTIVE_DEFECTS_RENAL_PELVIS_CONGEN_MALFO_URETER.gz",
+  save_path = "finngen_R11_Q17_CONGEN_OBSTRUCTIVE_DEFECTS_RENAL_PELVIS_CONGEN_MALFO_URETER.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONGEN_OBSTRUCTIVE_DEFECTS_RENAL_PELVIS_CONGEN_MALFO_URETER.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CONOTR_DEFEC.gz",
+  save_path = "finngen_R11_Q17_CONOTR_DEFEC.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CONOTR_DEFEC.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CRANIOSYNOSTOSIS.gz",
+  save_path = "finngen_R11_Q17_CRANIOSYNOSTOSIS.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CRANIOSYNOSTOSIS.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_CYSTIC_KIDNEY_DISEA.gz",
+  save_path = "finngen_R11_Q17_CYSTIC_KIDNEY_DISEA.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_CYSTIC_KIDNEY_DISEA.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_DOWNS_SYNDR.gz",
+  save_path = "finngen_R11_Q17_DOWNS_SYNDR.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_DOWNS_SYNDR.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_EHLER_SYNDR.gz",
+  save_path = "finngen_R11_Q17_EHLER_SYNDR.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_EHLER_SYNDR.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_HYPOSPADIAS.gz",
+  save_path = "finngen_R11_Q17_HYPOSPADIAS.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_HYPOSPADIAS.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_LVOTO_BROAD.gz",
+  save_path = "finngen_R11_Q17_LVOTO_BROAD.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_LVOTO_BROAD.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_LVOTO_NARROW.gz",
+  save_path = "finngen_R11_Q17_LVOTO_NARROW.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_LVOTO_NARROW.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_MONOSOMI_DELET_AUTOSOMES_NOT_ELSEW_CLASSIFIED.gz",
+  save_path = "finngen_R11_Q17_MONOSOMI_DELET_AUTOSOMES_NOT_ELSEW_CLASSIFIED.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_MONOSOMI_DELET_AUTOSOMES_NOT_ELSEW_CLASSIFIED.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_OSTEOCHONDROD_W_DEFECTS_GROWTH_TUBULAR_BONES_SPINE.gz",
+  save_path = "finngen_R11_Q17_OSTEOCHONDROD_W_DEFECTS_GROWTH_TUBULAR_BONES_SPINE.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_OSTEOCHONDROD_W_DEFECTS_GROWTH_TUBULAR_BONES_SPINE.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_OTHER_CHROMOSOME_ABNORMALITI_NOT_ELSEW_CLASSIFIED.gz",
+  save_path = "finngen_R11_Q17_OTHER_CHROMOSOME_ABNORMALITI_NOT_ELSEW_CLASSIFIED.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_OTHER_CHROMOSOME_ABNORMALITI_NOT_ELSEW_CLASSIFIED.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_OTHER_CONGEN_MALFO.gz",
+  save_path = "finngen_R11_Q17_OTHER_CONGEN_MALFO.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_OTHER_CONGEN_MALFO.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_OTHER_CONGEN_MALFO_BRAIN.gz",
+  save_path = "finngen_R11_Q17_OTHER_CONGEN_MALFO_BRAIN.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_OTHER_CONGEN_MALFO_BRAIN.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_OTHER_CONGEN_MALFO_CIRCULATO_SYSTEM.gz",
+  save_path = "finngen_R11_Q17_OTHER_CONGEN_MALFO_CIRCULATO_SYSTEM.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_OTHER_CONGEN_MALFO_CIRCULATO_SYSTEM.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_OTHER_CONGEN_MALFO_DIGES_SYSTEM1.gz",
+  save_path = "finngen_R11_Q17_OTHER_CONGEN_MALFO_DIGES_SYSTEM1.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_OTHER_CONGEN_MALFO_DIGES_SYSTEM1.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_OTHER_CONGEN_MALFO_DIGES_SYSTEM2.gz",
+  save_path = "finngen_R11_Q17_OTHER_CONGEN_MALFO_DIGES_SYSTEM2.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_OTHER_CONGEN_MALFO_DIGES_SYSTEM2.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_OTHER_CONGEN_MALFO_EAR.gz",
+  save_path = "finngen_R11_Q17_OTHER_CONGEN_MALFO_EAR.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_OTHER_CONGEN_MALFO_EAR.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_OTHER_CONGEN_MALFO_FACE_NECK.gz",
+  save_path = "finngen_R11_Q17_OTHER_CONGEN_MALFO_FACE_NECK.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_OTHER_CONGEN_MALFO_FACE_NECK.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_OTHER_CONGEN_MALFO_FEMALE_GENITALIA.gz",
+  save_path = "finngen_R11_Q17_OTHER_CONGEN_MALFO_FEMALE_GENITALIA.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_OTHER_CONGEN_MALFO_FEMALE_GENITALIA.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_OTHER_CONGEN_MALFO_HEART.gz",
+  save_path = "finngen_R11_Q17_OTHER_CONGEN_MALFO_HEART.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_OTHER_CONGEN_MALFO_HEART.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_OTHER_CONGEN_MALFO_INTESTINE.gz",
+  save_path = "finngen_R11_Q17_OTHER_CONGEN_MALFO_INTESTINE.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_OTHER_CONGEN_MALFO_INTESTINE.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_OTHER_CONGEN_MALFO_KIDNEY.gz",
+  save_path = "finngen_R11_Q17_OTHER_CONGEN_MALFO_KIDNEY.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_OTHER_CONGEN_MALFO_KIDNEY.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_OTHER_CONGEN_MALFO_LIMBS.gz",
+  save_path = "finngen_R11_Q17_OTHER_CONGEN_MALFO_LIMBS.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_OTHER_CONGEN_MALFO_LIMBS.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_OTHER_CONGEN_MALFO_MALE_GENITAL_ORGANS.gz",
+  save_path = "finngen_R11_Q17_OTHER_CONGEN_MALFO_MALE_GENITAL_ORGANS.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_OTHER_CONGEN_MALFO_MALE_GENITAL_ORGANS.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_OTHER_CONGEN_MALFO_NERVOUS_SYSTEM.gz",
+  save_path = "finngen_R11_Q17_OTHER_CONGEN_MALFO_NERVOUS_SYSTEM.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_OTHER_CONGEN_MALFO_NERVOUS_SYSTEM.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_OTHER_CONGEN_MALFO_NOT_ELSEW_CLASSIFIED.gz",
+  save_path = "finngen_R11_Q17_OTHER_CONGEN_MALFO_NOT_ELSEW_CLASSIFIED.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_OTHER_CONGEN_MALFO_NOT_ELSEW_CLASSIFIED.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_OTHER_CONGEN_MALFO_PERIP_VASCULAR_SYSTEM.gz",
+  save_path = "finngen_R11_Q17_OTHER_CONGEN_MALFO_PERIP_VASCULAR_SYSTEM.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_OTHER_CONGEN_MALFO_PERIP_VASCULAR_SYSTEM.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_OTHER_CONGEN_MALFO_RESPI_SYSTEM.gz",
+  save_path = "finngen_R11_Q17_OTHER_CONGEN_MALFO_RESPI_SYSTEM.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_OTHER_CONGEN_MALFO_RESPI_SYSTEM.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_OTHER_CONGEN_MALFO_SKIN.gz",
+  save_path = "finngen_R11_Q17_OTHER_CONGEN_MALFO_SKIN.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_OTHER_CONGEN_MALFO_SKIN.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_OTHER_CONGEN_MALFO_SKULL_FACE_BONES.gz",
+  save_path = "finngen_R11_Q17_OTHER_CONGEN_MALFO_SKULL_FACE_BONES.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_OTHER_CONGEN_MALFO_SKULL_FACE_BONES.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_OTHER_CONGEN_MALFO_TONGUE_MOUTH_PHARYNX.gz",
+  save_path = "finngen_R11_Q17_OTHER_CONGEN_MALFO_TONGUE_MOUTH_PHARYNX.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_OTHER_CONGEN_MALFO_TONGUE_MOUTH_PHARYNX.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_OTHER_CONGEN_MALFO_UPPER_ALIME_TRACT.gz",
+  save_path = "finngen_R11_Q17_OTHER_CONGEN_MALFO_UPPER_ALIME_TRACT.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_OTHER_CONGEN_MALFO_UPPER_ALIME_TRACT.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_OTHER_CONGEN_MALFO_URINARY_SYSTEM.gz",
+  save_path = "finngen_R11_Q17_OTHER_CONGEN_MALFO_URINARY_SYSTEM.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_OTHER_CONGEN_MALFO_URINARY_SYSTEM.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_OTHER_CONGEN_MUSCULOS_DEFORMITI.gz",
+  save_path = "finngen_R11_Q17_OTHER_CONGEN_MUSCULOS_DEFORMITI.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_OTHER_CONGEN_MUSCULOS_DEFORMITI.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_OTHER_OSTEOCHONDROD.gz",
+  save_path = "finngen_R11_Q17_OTHER_OSTEOCHONDROD.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_OTHER_OSTEOCHONDROD.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_OTHER_SEX_CHROMOSOME_ABNORMALITI_MALE_PHENOT_NOT_ELSEW_CLASSIFIED.gz",
+  save_path = "finngen_R11_Q17_OTHER_SEX_CHROMOSOME_ABNORMALITI_MALE_PHENOT_NOT_ELSEW_CLASSIFIED.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_OTHER_SEX_CHROMOSOME_ABNORMALITI_MALE_PHENOT_NOT_ELSEW_CLASSIFIED.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_OTHER_SPECIFE_CONGEN_MALFO_SYNDR_AFFECTING_MULTIPLE_SYSTEMS.gz",
+  save_path = "finngen_R11_Q17_OTHER_SPECIFE_CONGEN_MALFO_SYNDR_AFFECTING_MULTIPLE_SYSTEMS.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_OTHER_SPECIFE_CONGEN_MALFO_SYNDR_AFFECTING_MULTIPLE_SYSTEMS.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_PDA.gz",
+  save_path = "finngen_R11_Q17_PDA.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_PDA.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_PHAKOMATOSES_NOT_ELSEW_CLASSIFIED.gz",
+  save_path = "finngen_R11_Q17_PHAKOMATOSES_NOT_ELSEW_CLASSIFIED.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_PHAKOMATOSES_NOT_ELSEW_CLASSIFIED.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_REDUCT_DEFECTS_LOWER_LIMB.gz",
+  save_path = "finngen_R11_Q17_REDUCT_DEFECTS_LOWER_LIMB.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_REDUCT_DEFECTS_LOWER_LIMB.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_REDUCT_DEFECTS_UPPER_LIMB.gz",
+  save_path = "finngen_R11_Q17_REDUCT_DEFECTS_UPPER_LIMB.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_REDUCT_DEFECTS_UPPER_LIMB.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_RENAL_AGENE_OTHER_REDUCT_DEFECTS_KIDNEY.gz",
+  save_path = "finngen_R11_Q17_RENAL_AGENE_OTHER_REDUCT_DEFECTS_KIDNEY.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_RENAL_AGENE_OTHER_REDUCT_DEFECTS_KIDNEY.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_RVOTO.gz",
+  save_path = "finngen_R11_Q17_RVOTO.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_RVOTO.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_SEPTA_DEFEC.gz",
+  save_path = "finngen_R11_Q17_SEPTA_DEFEC.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_SEPTA_DEFEC.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_SPINA_BIFIDA.gz",
+  save_path = "finngen_R11_Q17_SPINA_BIFIDA.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_SPINA_BIFIDA.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_SYNDACTYLY.gz",
+  save_path = "finngen_R11_Q17_SYNDACTYLY.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_SYNDACTYLY.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_Q17_UNDES_TESTICLE.gz",
+  save_path = "finngen_R11_Q17_UNDES_TESTICLE.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_Q17_UNDES_TESTICLE.mungesumstats_log"
+)
+
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_CHRONLARGE.gz",
+  save_path = "finngen_R11_CHRONLARGE.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_CHRONLARGE.mungesumstats_log"
+  )
+  
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_CHRONNAS.gz",
+  save_path = "finngen_R11_CHRONNAS.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_CHRONNAS.mungesumstats_log"
+  )
+  
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_CHRONOTH.gz",
+  save_path = "finngen_R11_CHRONOTH.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_CHRONOTH.mungesumstats_log"
+  )
+  
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_CHRONSMALL.gz",
+  save_path = "finngen_R11_CHRONSMALL.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_CHRONSMALL.mungesumstats_log"
+  )
+  
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_K11_CD_STRICT_PSC.gz",
+  save_path = "finngen_R11_K11_CD_STRICT_PSC.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_K11_CD_STRICT_PSC.mungesumstats_log"
+  )
+  
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_RX_CROHN_1STLINE.gz",
+  save_path = "finngen_R11_RX_CROHN_1STLINE.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_RX_CROHN_1STLINE.mungesumstats_log"
+  )
+  
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_RX_CROHN_2NDLINE.gz",
+  save_path = "finngen_R11_RX_CROHN_2NDLINE.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_RX_CROHN_2NDLINE.mungesumstats_log"
+  )
+  
+reformatted_finngen <- MungeSumstats::format_sumstats(
+  path="FINNGEN/finngen_R11_SLE_FG.gz",
+  save_path = "finngen_R11_SLE_FG.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh38",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "finngen_R11_SLE_FG.mungesumstats_log"
+  )
+
