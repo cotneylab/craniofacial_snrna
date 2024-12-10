@@ -12,3 +12,6 @@ Script for generating interactive website is found in shinycell directory.
 
 Cellranger data files and Seurat objects for human and mouse can be found on zenodo: https://doi.org/10.5281/zenodo.14343226
 
+These data can also be explored in an interactive format based on ShinyCell here: https://cotneyshiny.research.chop.edu/shiny-apps/craniofacial_all_snRNA/
+
+
