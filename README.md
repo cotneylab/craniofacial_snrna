@@ -10,5 +10,5 @@ Scripts for generation of major panels in main figure 7-8 are found in magma_cel
 
 Script for generating interactive website is found in shinycell directory.
 
-Cellranger data files for human and mouse can be found on zenodo: https://doi.org/10.5281/zenodo.14343226
+Cellranger data files and Seurat objects for human and mouse can be found on zenodo: https://doi.org/10.5281/zenodo.14343226
 
