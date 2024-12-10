@@ -1,0 +1,1 @@
+Retrieve XiongZ_31763980.txt.gz summary statistics from GWAS Catalog https://ftp.ebi.ac.uk/pub/databases/gwas/summary_statistics/GCST009001-GCST010000/GCST009464/XiongZ_31763980.txt.gz

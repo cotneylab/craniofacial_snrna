@@ -1,0 +1,472 @@
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Forehead_Protrusion_1.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Forehead_Protrusion_2.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Forehead_Size_1.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Forehead_Size_2.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Brow_Ridge_Protrusion_1.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Brow_Ridge_Protrusion_2.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Eye_Size_1.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Eye_Size_2.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Nasion_Depth_1.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Nasion_Depth_2.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Nasion_Position_1.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Nasion_Position_2.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Eye_Position_1.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Eye_Position_2.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Nose_Height.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Nose_Protrusion.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Nose_Size.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Nose_Roundness_1.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Nose_Roundness_2.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Nose_Roundness_3.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Nose_Curvature_1.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Nose_Curvature_2.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Nose_Curvature_3.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Columella_Inclination.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Nostril_Inclination.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Nostril_Size.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Columella_Size.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Lip_Thickness_1.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Lip_Thickness_2.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Lip_Thickness_3.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Upper_Lip_Thickness_1.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Lower_Lip_Thickness_1.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Upper_Lip_Thickness_2.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Lower_Lip_Thickness_2.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Lip_Thickness_Ratio_1.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Lip_Thickness_Ratio_2.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Upper_Lip_Protrusion.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Lower_Lip_Protrusion.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Lip_Protrusion.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Lip_Width_1.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Lip_Width_2.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Philtrum_Length.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Chin_Protrusion_1.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Chin_Protrusion_2.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Ear_Size.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Ear_Inclination.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Jaw_Protrusion_1.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Jaw_Protrusion_2.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Jaw_Protrusion_3.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Jaw_Protrusion_4.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Jaw_Protrusion_5.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Jaw_Slope_1.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Chin_Roundness.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Jaw_Slope_2.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Upper_Face_Flatness.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Face_Flatness.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Brow_Ridge_Protrusion_3.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Mid_Face_Flatness.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/cotneyj/Desktop/scRNA-Seq_GWAS/Lower_Face_Flatness.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 6169,
+  population = "amr",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )

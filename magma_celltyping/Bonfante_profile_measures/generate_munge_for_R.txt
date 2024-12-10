@@ -1,0 +1,1003 @@
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait1.tsv",
+  save_path = "Forehead_Protrusion_1.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Forehead_Protrusion_1.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait2.tsv",
+  save_path = "Forehead_Protrusion_2.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Forehead_Protrusion_2.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait3.tsv",
+  save_path = "Forehead_Size_1.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Forehead_Size_1.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait4.tsv",
+  save_path = "Forehead_Size_2.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Forehead_Size_2.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait5.tsv",
+  save_path = "Brow_Ridge_Protrusion_1.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Brow_Ridge_Protrusion_1.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait6.tsv",
+  save_path = "Brow_Ridge_Protrusion_2.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Brow_Ridge_Protrusion_2.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait7.tsv",
+  save_path = "Eye_Size_1.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Eye_Size_1.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait8.tsv",
+  save_path = "Eye_Size_2.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Eye_Size_2.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait9.tsv",
+  save_path = "Nasion_Depth_1.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Nasion_Depth_1.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait10.tsv",
+  save_path = "Nasion_Depth_2.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Nasion_Depth_2.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait11.tsv",
+  save_path = "Nasion_Position_1.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Nasion_Position_1.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait12.tsv",
+  save_path = "Nasion_Position_2.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Nasion_Position_2.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait13.tsv",
+  save_path = "Eye_Position_1.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Eye_Position_1.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait14.tsv",
+  save_path = "Eye_Position_2.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Eye_Position_2.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait15.tsv",
+  save_path = "Nose_Height.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Nose_Height.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait16.tsv",
+  save_path = "Nose_Protrusion.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Nose_Protrusion.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait17.tsv",
+  save_path = "Nose_Size.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Nose_Size.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait18.tsv",
+  save_path = "Nose_Roundness_1.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Nose_Roundness_1.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait19.tsv",
+  save_path = "Nose_Roundness_2.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Nose_Roundness_2.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait20.tsv",
+  save_path = "Nose_Roundness_3.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Nose_Roundness_3.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait21.tsv",
+  save_path = "Nose_Curvature_1.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Nose_Curvature_1.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait22.tsv",
+  save_path = "Nose_Curvature_2.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Nose_Curvature_2.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait23.tsv",
+  save_path = "Nose_Curvature_3.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Nose_Curvature_3.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait24.tsv",
+  save_path = "Columella_Inclination.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Columella_Inclination.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait25.tsv",
+  save_path = "Nostril_Inclination.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Nostril_Inclination.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait26.tsv",
+  save_path = "Nostril_Size.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Nostril_Size.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait27.tsv",
+  save_path = "Columella_Size.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Columella_Size.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait28.tsv",
+  save_path = "Lip_Thickness_1.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Lip_Thickness_1.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait29.tsv",
+  save_path = "Lip_Thickness_2.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Lip_Thickness_2.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait30.tsv",
+  save_path = "Lip_Thickness_3.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Lip_Thickness_3.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait31.tsv",
+  save_path = "Upper_Lip_Thickness_1.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Upper_Lip_Thickness_1.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait32.tsv",
+  save_path = "Lower_Lip_Thickness_1.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Lower_Lip_Thickness_1.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait33.tsv",
+  save_path = "Upper_Lip_Thickness_2.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Upper_Lip_Thickness_2.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait34.tsv",
+  save_path = "Lower_Lip_Thickness_2.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Lower_Lip_Thickness_2.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait35.tsv",
+  save_path = "Lip_Thickness_Ratio_1.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Lip_Thickness_Ratio_1.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait36.tsv",
+  save_path = "Lip_Thickness_Ratio_2.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Lip_Thickness_Ratio_2.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait37.tsv",
+  save_path = "Upper_Lip_Protrusion.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Upper_Lip_Protrusion.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait38.tsv",
+  save_path = "Lower_Lip_Protrusion.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Lower_Lip_Protrusion.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait39.tsv",
+  save_path = "Lip_Protrusion.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Lip_Protrusion.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait40.tsv",
+  save_path = "Lip_Width_1.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Lip_Width_1.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait41.tsv",
+  save_path = "Lip_Width_2.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Lip_Width_2.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait42.tsv",
+  save_path = "Philtrum_Length.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Philtrum_Length.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait43.tsv",
+  save_path = "Chin_Protrusion_1.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Chin_Protrusion_1.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait44.tsv",
+  save_path = "Chin_Protrusion_2.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Chin_Protrusion_2.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait45.tsv",
+  save_path = "Ear_Size.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Ear_Size.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait46.tsv",
+  save_path = "Ear_Inclination.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Ear_Inclination.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait47.tsv",
+  save_path = "Jaw_Protrusion_1.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Jaw_Protrusion_1.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait48.tsv",
+  save_path = "Jaw_Protrusion_2.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Jaw_Protrusion_2.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait49.tsv",
+  save_path = "Jaw_Protrusion_3.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Jaw_Protrusion_3.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait50.tsv",
+  save_path = "Jaw_Protrusion_4.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Jaw_Protrusion_4.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait51.tsv",
+  save_path = "Jaw_Protrusion_5.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Jaw_Protrusion_5.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait52.tsv",
+  save_path = "Jaw_Slope_1.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Jaw_Slope_1.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait53.tsv",
+  save_path = "Chin_Roundness.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Chin_Roundness.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait54.tsv",
+  save_path = "Jaw_Slope_2.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Jaw_Slope_2.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait55.tsv",
+  save_path = "Upper_Face_Flatness.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Upper_Face_Flatness.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait56.tsv",
+  save_path = "Face_Flatness.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Face_Flatness.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait57.tsv",
+  save_path = "Brow_Ridge_Protrusion_3.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Brow_Ridge_Protrusion_3.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait58.tsv",
+  save_path = "Mid_Face_Flatness.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Mid_Face_Flatness.mungesumstats_log"
+  )
+  
+reformatted_ruiz <- MungeSumstats::format_sumstats(
+  path="RUIZ/trait59.tsv",
+  save_path = "Lower_Face_Flatness.formatted.tsv.bgz",
+  force_new = TRUE,
+  ref_genome="GRCh37",
+  convert_ref_genome="GRCh38",
+  local_chain = "GRCh37_to_GRCh38.chain",
+  dbSNP = 155,
+  allele_flip_check = TRUE,
+  bi_allelic_filter = TRUE,
+  write_vcf=FALSE,
+  tabix_index=TRUE,
+  nThread = 8,
+  log_mungesumstats_msgs=TRUE,
+  log_folder= "Lower_Face_Flatness.mungesumstats_log"
+  )
+  

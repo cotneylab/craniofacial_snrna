@@ -1,0 +1,368 @@
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.AlL-AlR.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.AlL-AlR.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.AlL-Ls.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.AlL-Ls.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.AlL-Sn.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.AlL-Sn.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.AlR-ChL.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.AlR-ChL.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.EnL-AlL.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.EnL-AlL.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.EnL-Sn.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.EnL-Sn.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.EnR-AlR.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.EnR-AlR.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.EnR-ChL.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.EnR-ChR.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.EnR-ChR.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.EnR-N.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.EnR-N.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.EnR-Prn.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.EnR-Prn.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.EnR-Sn.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.EnR-Sn.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.ExL-AlL.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.ExL-AlL.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.ExR-ChL.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.ExR-ChL.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.ExR-ChR.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.ExR-ChR.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.ExR-N.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.ExR-N.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.N-EnL.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.N-EnL.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.N-ExL.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.N-ExL.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.N-Prn.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.N-Prn.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.Prn-AlL.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.Prn-AlL.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.Prn-AlR.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.Prn-AlR.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.Prn-EnL.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.Prn-EnL.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.Prn-Ls.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.Prn-Ls.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
+genesOut <- MAGMA.Celltyping::map_snps_to_genes(
+  path_formatted = "/Users/justincotney/Desktop/scRNA-Seq_GWAS/XiongZ_31763980.Sn-AlR.formatted.tsv.bgz",
+  genome_build = "GRCh38",
+  N = 10115,
+  population = "eur",
+  upstream_kb = 100,
+  downstream_kb = 100
+  )
