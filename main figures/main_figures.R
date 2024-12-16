@@ -11,7 +11,7 @@ library(ggridges)
 library(scCustomize)
 
 initial <- readRDS("Initial_data.rds")
-cds1 <- readRDS("cds_face_human_temp.rds")
+cds1 <- readRDS("~/Desktop/scRNA-Seq_GWAS/cds_face_human_temp.rds")
 cds2 <- cds1
 Idents(cds1) <- "cell_type1"
 
@@ -210,9 +210,17 @@ p4
 p5
 p6
 dev.off()
-#check for M/F with XIST
-pdf(file = "xist_expression_per_sample.pdf")
-VlnPlot(cds1, features = "XIST", split.by = "orig.ident", group.by = "orig.ident") + RotatedAxis() + NoLegend()
+#check for M/F with XIST and other genes
+male_genes = c("UTY", "DDX3Y", "KDM5D", "NLGN4Y")
+female_genes = c("XIST", "TSIX")
+sex_determination_genes = c(male_genes, female_genes)
+
+VlnPlot(cds1, features = male_genes, split.by = "orig.ident", group.by = "orig.ident") + RotatedAxis() + NoLegend()
+VlnPlot(cds1, features = female_genes, split.by = "orig.ident", group.by = "orig.ident") + RotatedAxis() + NoLegend()
+VlnPlot(cds1, features = sex_determination_genes, split.by = "orig.ident", group.by = "orig.ident", stack = T, flip = T) & NoLegend()
+
+pdf(file = "plots/xist_expression_per_sample.pdf")
+VlnPlot(cds1, features = sex_determination_genes, split.by = "orig.ident", group.by = "orig.ident", stack = T, flip = T) & NoLegend()
 dev.off()
 
 sig_genes_initial <- FindAllMarkers(initial, assay = "RNA" ,logfc.threshold = 0.25, test.use = "wilcox", min.pct = 0.1, 
