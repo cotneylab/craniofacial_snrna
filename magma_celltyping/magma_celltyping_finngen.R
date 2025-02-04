@@ -1,6 +1,6 @@
 
 #neurogenomicslab/magma.celltyping
-Sys.setenv(GITHUB_PAT="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")
+Sys.setenv(GITHUB_PAT="your token")
 install.packages("piggyback")
 Sys.setenv('R_MAX_VSIZE'=64000000000)
 if(!require("remotes")) install.packages("remotes")
