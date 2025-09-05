@@ -1,0 +1,1494 @@
+---
+title: "Mesenchyme_subclustering_and_annotation"
+output: html_document
+date: "2025-04-05"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "/scr1/users/manchela/Data") 
+library(Seurat)
+library(SeuratDisk)
+library(tidyverse)
+library(harmony)
+library(dplyr)
+library(patchwork)
+library(viridis)
+library(ggforce)
+library(gghalves)
+library(ggridges)
+library(scCustomize)
+library(SCpubr)
+library(dplyr)
+library(DropletUtils)
+library(biomaRt)
+library(limma)
+library(pheatmap)
+library(grid)
+library(openxlsx)
+library(clusterProfiler)
+library(enrichplot)
+library(org.Hs.eg.db)
+library(AnnotationHub)
+library(ReactomePA)
+library(DOSE)
+library(orthogene)
+library(factoextra)
+library(smerc)
+library(Rfast)
+library(GeneOverlap)
+library(reshape2)
+library(ggalluvial)
+library(scales)
+```
+
+Mesenchyme Subclustering
+
+```{r}
+mes <- initial.filt_singlet_noneuro[,which(initial.filt_singlet_noneuro$celltype=="mesenchyme")]
+
+mes <- NormalizeData(mes)
+mes <- CellCycleScoring(mes, s.features = cc.genes$s.genes, g2m.features = cc.genes$g2m.genes, set.ident = TRUE)
+
+mes <- FindVariableFeatures(mes) %>% 
+  ScaleData(vars.to.regress = c("S.Score", "G2M.Score")) %>% 
+  RunPCA(verbose = FALSE) %>% 
+  RunHarmony(group.by.vars = "orig.ident")
+
+mes <- RunUMAP(mes, reduction = "harmony", dims = 1:30, min.dist = 0.3) %>%
+  FindNeighbors(reduction = "harmony", dims = 1:30, verbose = FALSE) %>%
+  FindClusters(resolution = c(0.2,0.4,0.6,0.8,1,2,3,4), verbose = FALSE)
+
+```
+
+```{r}
+mes <- readRDS("human_face_mes_cellrangerARC-raw_emptyDrops_singlets_8Apr.rds")
+
+dim(mes)
+```
+
+
+Identify optimal number of clusters
+
+```{r}
+# downsample because # of cells is too high for dist calculation
+set.seed(123)
+subset_idx<- sample(1:ncol(mes),round(ncol(mes)*0.25))
+mes_downsample <- mes[,subset_idx]
+
+x=mes_downsample@assays$RNA$scale.data
+diss <- Rfast::Dist(as.matrix(x))
+
+k.max=100
+v <- rep(0, k.max)
+for (i in 1:k.max) {
+  clust <- kmeans(x, i)
+  v[i] <- factoextra:::.get_withinSS(diss, clust$cluster)
+  cat(i)
+}
+
+
+df <- data.frame(clusters = as.factor(1:k.max), y = v, 
+                 stringsAsFactors = TRUE)
+
+```
+
+```{r}
+ylab <- "Total Within Sum of Square"
+p <- ggpubr::ggline(df, x = "clusters", y = "y", group = 1, 
+                    color = "steelblue", ylab = ylab, xlab = "Number of clusters k", 
+                    main = "Mesenchyme: Optimal number of clusters")
+
+p <- readRDS("human_face_mes_ElbowPlot_data_27Mar.rds")
+p + scale_x_discrete(breaks = seq(0, max(as.numeric(as.character(p$data$clusters))), by = 5))+
+  geom_vline(xintercept = elbow_point(as.numeric(p$data$clusters),as.numeric(p$data$y))$x, linetype=2)
+
+elbow_point(as.numeric(p$data$clusters),as.numeric(p$data$y))
+# x= 22 clusters
+
+apply(mes@meta.data[,grep("RNA_snn_res",colnames(mes@meta.data))],2,function(x) length(unique(x)))
+# choosing resolution=0.8 (25 clusters)
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mesenchyme_Subclustering_OptimalClusters_ElbowPlot.pdf",width=11,height=8.5)
+p + scale_x_discrete(breaks = seq(0, max(as.numeric(as.character(p$data$clusters))), by = 5))+
+  geom_vline(xintercept = elbow_point(as.numeric(p$data$clusters),as.numeric(p$data$y))$x, linetype=2)
+dev.off()
+```
+
+```{r}
+stage_colors <- viridis_plasma_dark_high[match(1:6,cut(1:length(viridis_plasma_dark_high), breaks = 6,labels=1:6))]
+names(stage_colors) <- levels(initial.filt_singlet$stage)
+
+p1 <- DimPlot_scCustom(mes, group.by="orig.ident",colors_use = hue_pal()(length(unique(mes$orig.ident))),label=F)
+
+p2 <- DimPlot_scCustom(mes, group.by="stage",colors_use = stage_colors,label=F)
+
+p3 <- DimPlot_scCustom(mes, group.by="RNA_snn_res.0.8",colors_use = hue_pal()(length(unique(mes$RNA_snn_res.0.8))),
+                       label=T,label.box=T,repel=T) +
+  scale_fill_manual(values = rep("white",length(unique(mes$RNA_snn_res.0.8)))) + NoLegend()
+
+p1
+p2
+p3
+```
+
+```{r}
+
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mesenchyme_subclustering_Dimplots.pdf",width=11,height=8.5)
+p1
+p2
+p3
+dev.off()
+```
+
+Find marker genes
+```{r}
+mart <-  useMart("ENSEMBL_MART_ENSEMBL") #, host = "https://useast.ensembl.org")
+mart <- useDataset("hsapiens_gene_ensembl", mart)
+mes_annotLookup <- getBM(
+  mart = mart,
+  attributes = c(
+    "hgnc_symbol","description",
+    "entrezgene_id", "ensembl_gene_id",
+    "gene_biotype"),
+  filter = "hgnc_symbol",
+  values = rownames(mes),
+  uniqueRows=TRUE)
+  
+
+
+Idents(mes) <- mes$RNA_snn_res.0.8
+mes_marker_genes <- FindAllMarkers(mes, assay = "RNA" ,logfc.threshold = 0.25, test.use = "wilcox", min.pct = 0.1, 
+                                   min.diff.pct = -Inf, node = NULL, verbose = TRUE,
+                                   only.pos = TRUE, max.cells.per.ident = Inf, random.seed = 1,
+                                   latent.vars = NULL, min.cells.feature = 3, min.cells.group = 3,
+                                   pseudocount.use = 1, return.thresh = 0.01)
+
+mes_marker_genes <- mutate(mes_marker_genes,pct.diff=pct.1-pct.2)
+id <- intersect(mes_annotLookup$hgnc_symbol,mes_marker_genes$gene)
+x <- mes_marker_genes[mes_marker_genes$gene %in% id,]
+mes_marker_genes$Entrez <- mes_annotLookup$entrezgene_id[match(as.character(mes_marker_genes$gene),mes_annotLookup$hgnc_symbol)]
+mes_marker_genes$description <- mes_annotLookup$description[match(as.character(mes_marker_genes$gene),mes_annotLookup$hgnc_symbol)]
+mes_marker_genes$biotype <- mes_annotLookup$gene_biotype[match(as.character(mes_marker_genes$gene),mes_annotLookup$hgnc_symbol)]
+
+mes_marker_genes <- mes_marker_genes[, c("gene","Entrez","description","biotype","p_val_adj","avg_log2FC","pct.1","pct.2","pct.diff","cluster")]
+head(mes_marker_genes)
+#openxlsx::write.xlsx(mes_marker_genes,"Craniofacial-scRNAseqManuscript/final-tables/SigGenes_Mes_Res0.8Clusters.xlsx")
+```
+
+
+top marker genes
+```{r} 
+mes_marker_genes <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/SigGenes_Mes_Res0.8Clusters.xlsx")
+
+mes_marker_genes_protein <- subset(mes_marker_genes, biotype == "protein_coding")
+
+top_mes <- mes_marker_genes_protein %>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% top_n(10, avg_log2FC)
+top100_mes <- mes_marker_genes_protein %>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% top_n(100, avg_log2FC)
+top100pval_mes <- subset(top100_mes, rowSums(top100_mes[5] < 0.05) > 0)
+
+top50_mes <- mes_marker_genes_protein %>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% top_n(50, avg_log2FC)
+top50pval_mes <- subset(top50_mes, rowSums(top50_mes[5] < 0.05) > 0)
+```
+
+dot plot of top marker genes
+```{r}
+
+mes_marker_genes_protein <- mes_marker_genes_protein[order(mes_marker_genes_protein$cluster),]
+
+top_initial_mes <- mes_marker_genes_protein %>% group_by(cluster) %>% top_n(10, avg_log2FC)
+
+Idents(mes) <- mes$RNA_snn_res.0.8
+  p <- DotPlot(object = mes, features = unique(top_initial_mes$gene))+ coord_flip()+ RotatedAxis()
+df <- data.frame(Gene = p$data$features.plot, avg.exp = p$data$avg.exp.scaled, pct.exp = p$data$pct.exp, cluster = p$data$id)
+
+out <- DotPlot_scCustom(seurat_object = mes, features = unique(top_initial_mes$gene), colors_use = viridis_plasma_dark_high,flip_axes=T,
+                         remove_axis_titles = T,x_lab_rotate = T) + theme(axis.text.x = element_text(size = 10),axis.text.y = element_text(size = 6, face = "italic"))
+out
+
+
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mesenchyme_Res0.8Clusters_markergenes_dotplot.pdf",width=8.5,height=18)
+out
+dev.off()
+
+```
+
+
+Functional annotation
+
+```{r}
+df1 <- top100pval_mes[,c(2,10)]
+df1$cluster <- factor(df1$cluster,levels=levels(df1$cluster))
+df1sample <- split(df1$Entrez,df1$cluster)
+length(df1sample)
+initial_types <- names(df1sample)
+
+genelist <- as.list(df1sample)
+background_genes <- unique(mes_marker_genes_protein$Entrez)
+
+BPclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'BP', universe = background_genes)
+BPclusterplot <- pairwise_termsim(BPclusterplot)
+
+CCclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'CC', universe = background_genes)
+CCclusterplot <- pairwise_termsim(CCclusterplot)
+
+MFclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'MF', universe = background_genes)
+MFclusterplot <- pairwise_termsim(MFclusterplot)
+
+Pathwayclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichPathway", pvalueCutoff=0.05, pAdjustMethod = "BH", universe = background_genes)
+Pathwayclusterplot <- pairwise_termsim(Pathwayclusterplot)
+
+KEGGclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichKEGG", pvalueCutoff=0.05, pAdjustMethod = "BH", universe = background_genes)
+KEGGclusterplot <- pairwise_termsim(KEGGclusterplot)
+
+DOclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichDGN", pvalueCutoff=0.05, pAdjustMethod = "BH", universe = background_genes)
+DOclusterplot <- pairwise_termsim(DOclusterplot)
+
+
+options(enrichplot.colours = c("blue", "grey"))
+p1 <- dotplot(BPclusterplot, showCategory = 5, font.size = 6, title = "GO: Biological Process", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("orange", "grey"))
+p2 <- dotplot(CCclusterplot, showCategory = 5, font.size = 6, title = "GO: Cellular Component", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("green", "grey"))
+p3 <- dotplot(MFclusterplot, showCategory = 5, font.size = 6, title = "GO: Molecular Function", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("brown", "grey"))
+p4 <- dotplot(Pathwayclusterplot, showCategory = 10, font.size = 6, title = "Reactome Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("yellow", "grey"))
+p5 <- dotplot(KEGGclusterplot, showCategory = 10, font.size = 6, title = "KEGG Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("red", "grey"))
+p6 <- dotplot(DOclusterplot, showCategory = 10, font.size = 6, title = "DisGeNet", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+
+p1
+p2
+p3
+p4
+p5
+p6
+
+
+```
+
+```{r}
+mes_annot_list <- list(BP =BPclusterplot, CC=CCclusterplot, MF = MFclusterplot, Reactome=Pathwayclusterplot,
+                          KEGG=KEGGclusterplot, DisGeNet=DOclusterplot)
+saveRDS(mes_annot_list, "human_face_mes_Res0.8Clusters_functional-annotation_lists_27Mar.rds")
+
+mes_annot_list <- readRDS("human_face_mes_Res0.8Clusters_functional-annotation_lists_27Mar.rds")
+mes_annot_list$BP <- mes_annot_list$BP@compareClusterResult
+mes_annot_list$CC <- mes_annot_list$CC@compareClusterResult
+mes_annot_list$MF <- mes_annot_list$MF@compareClusterResult
+mes_annot_list$Reactome <- mes_annot_list$Reactome@compareClusterResult
+mes_annot_list$KEGG <- mes_annot_list$KEGG@compareClusterResult
+mes_annot_list$DisGeNet <- mes_annot_list$DisGeNet@compareClusterResult
+openxlsx::write.xlsx(mes_annot_list, file = "Craniofacial-scRNAseqManuscript/final-tables/human_face_mes_Res0.8Clusters_functional-annotation.xlsx",
+                     sheetName = names(mes_annot_list), rowNames = FALSE)
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mesenchyme_Res0.8Clusters_Top10_FunctionalEnrichment_dotplot.pdf",width=8.5,height=16)
+p1
+p2
+p3
+p4
+p5
+p6
+dev.off()
+```
+
+
+Loading in the mouse mesenchyme data
+```{r}
+mmes <- readRDS("mmes_final.rds")
+```
+
+DimPlots of relevant annotations
+```{r}
+stage_colors_mouse <- stage_colors
+names(stage_colors_mouse) <- levels(mmes$stage)
+
+p1 <- DimPlot_scCustom(mmes, group.by="orig.ident",colors_use = hue_pal()(length(unique(mmes$orig.ident))),label=F)
+
+p2 <- DimPlot_scCustom(mmes, group.by="stage",colors_use = stage_colors_mouse,label=F)
+
+p3 <- DimPlot_scCustom(mmes, group.by="annotation",colors_use = hue_pal()(length(unique(mmes$annotation))),
+                       label=T,label.box=T,repel=T) +
+  scale_fill_manual(values = rep("white",length(unique(mmes$annotation)))) + NoLegend()
+
+
+p1
+p2
+p3
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Mes_subtype_final_DimPlots.pdf",height=8.5,width=11)
+p1
+p2
+p3
+dev.off()
+```
+
+BarPlots by stage
+```{r}
+mmes$annotation <- factor(mmes$annotation,levels=names(sort(table(mmes$annotation),decreasing=T)))
+
+p5 <- SCpubr::do_BarPlot(mmes, 
+                   group.by = "stage",
+                   split.by = "annotation",
+                   position = "fill",
+                   flip = FALSE, 
+                   legend.position = "right",
+                   colors.use = stage_colors_mouse)
+p5
+
+p6 <- SCpubr::do_BarPlot(mmes, 
+                   group.by = "stage",
+                   split.by = "annotation",
+                   position = "stack",
+                   flip = FALSE,
+                   legend.position = "right",
+                   colors.use = stage_colors_mouse)
+p6
+
+
+p7 <- SCpubr::do_BarPlot(mmes, 
+                   group.by = "annotation",
+                   split.by = "stage",
+                   position = "fill",
+                   flip = FALSE, 
+                   legend.position = "right")
+p7
+
+p8 <- SCpubr::do_BarPlot(mmes, 
+                   group.by = "annotation",
+                   split.by = "stage",
+                   position = "stack",
+                   flip = FALSE, 
+                   legend.position = "right")
+p8
+
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Mes_subtype_stage_barplot.pdf",width=11,height=8.5)
+p5
+p6
+p7
+p8
+dev.off()
+```
+
+
+Getting marker genes for each cluster
+```{r}
+annotLookup_ortho_one2one <- orthogene::convert_orthologs(rownames(mmes),input_species="mouse",output_species = "human",
+                                                          non121_strategy = "drop_both_species", method="gprofiler") 
+
+mmes1 <- mmes[which(rownames(mmes)%in%annotLookup_ortho_one2one$input_gene),]
+rownames(mmes1) <- rownames(annotLookup_ortho_one2one)[match(rownames(mmes1),annotLookup_ortho_one2one$input_gene)]
+
+```
+
+marker genes for mouse mesenchyme
+```{r}
+Idents(mmes1) <- mmes1$annotation
+mmes1_marker_genes <- FindAllMarkers(mmes1, assay = "RNA" ,logfc.threshold = 0.25, test.use = "wilcox", min.pct = 0.1, 
+                                   min.diff.pct = -Inf, node = NULL, verbose = TRUE,
+                                   only.pos = TRUE, max.cells.per.ident = Inf, random.seed = 1,
+                                   latent.vars = NULL, min.cells.feature = 3, min.cells.group = 3,
+                                   pseudocount.use = 1, return.thresh = 0.01)
+
+mmes1_marker_genes <- mutate(mmes1_marker_genes,pct.diff=pct.1-pct.2)
+# openxlsx::write.xlsx(mmes1_marker_genes,"Craniofacial-scRNAseqManuscript/final-tables/Mouse_Mes_SigGenes_subtype_final.xlsx")
+```
+
+```{r}
+mmes1 <- readRDS("mmes1_final.rds")
+```
+
+```{r}
+mmes1$subtype_final <- mmes1$annotation
+```
+
+top tf marker genes
+```{r}
+sig_genes_mmes_subtypes <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/Mouse_Mes_SigGenes_subtype_final.xlsx")
+sig_genes_mmes_subtypes <- sig_genes_mmes_subtypes[order(sig_genes_mmes_subtypes$cluster),]
+
+sig_genes_mmes_subtypes$ensemblID <- mes_annotLookup$ensembl_gene_id[match(sig_genes_mmes_subtypes$gene,mes_annotLookup$hgnc_symbol)]
+sig_genes_mmes_subtypes$biotype <- mes_annotLookup$gene_biotype[match(sig_genes_mmes_subtypes$gene,mes_annotLookup$hgnc_symbol)]
+
+sig_genes_mmes_subtypes$TF <- "No"
+sig_genes_mmes_subtypes$TF[which(sig_genes_mmes_subtypes$ensemblID%in%tf_table$Human_TF)] <- "Yes"
+
+sig_genes_mmes_subtypes_protein <- sig_genes_mmes_subtypes %>% filter(biotype == "protein_coding",TF=="Yes",p_val_adj<0.05)
+
+top_initial_mmes_subtype <- sig_genes_mmes_subtypes_protein %>% group_by(cluster) %>% top_n(5, avg_log2FC)
+
+Idents(mmes1) <- factor(as.character(mmes1$annotation),levels=sort(unique(as.character(mmes1$annotation))))
+  p <- DotPlot(object = mmes1, features = unique(top_initial_mmes_subtype$gene))+ coord_flip()+ RotatedAxis()
+df <- data.frame(Gene = p$data$features.plot, avg.exp = p$data$avg.exp.scaled, pct.exp = p$data$pct.exp, cluster = p$data$id)
+
+out <- DotPlot_scCustom(seurat_object = mmes1, features = unique(top_initial_mmes_subtype$gene), colors_use = viridis_plasma_dark_high,flip_axes=T,
+                         remove_axis_titles = T,x_lab_rotate = T) + 
+  theme(axis.text.x = element_text(size = 10),axis.text.y = element_text(size = 6, face = "italic"),
+        legend.position = "bottom",legend.justification = "center", legend.title = element_text(size = 10, hjust=0.5),
+        legend.text = element_text(size = 10))+guides(color = guide_colorbar(title.position = "top",title = "Average Expression"),
+                                                      size = guide_legend(title.position = "top",title = "Percent Expressed")) 
+out
+
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Mes_subtype_final_TF_markergenes_dotplot.pdf",width=10,height=14)
+out
+dev.off()
+
+```
+
+```{r}
+
+top5.markers <- top_initial_mmes_subtype %>% group_by(cluster) %>% top_n(5,avg_log2FC)
+
+mmes1.topmarkers.scale <- ScaleData(mmes1, features = unique(top5.markers$gene))
+mmes1.topmarkers.scale.pseudo <- AggregateExpression(mmes1.topmarkers.scale,group.by = "subtype_final",return.seurat = T)
+
+p <- DoHeatmap(mmes1.topmarkers.scale.pseudo,features=unique(top5.markers$gene),label = F)
+
+p
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Mes_subtype_markergenes_Pseudobulk_Heatmap.pdf",width=8,height=8)
+p
+dev.off()
+```
+
+Transfer Mouse mesenchyme subtypes to human mesenchyme clusters using rpca
+
+```{r}
+
+annotLookup_ortho_one2one <- orthogene::convert_orthologs(rownames(mmes),input_species="mouse",output_species = "human",
+                                                          non121_strategy = "drop_both_species", method="gprofiler") 
+
+mmes1 <- mmes[which(rownames(mmes)%in%annotLookup_ortho_one2one$input_gene),]
+rownames(mmes1) <- rownames(annotLookup_ortho_one2one)[match(rownames(mmes1),annotLookup_ortho_one2one$input_gene)]
+
+
+Idents(mmes1) <- mmes1$annotation
+anchors <- FindTransferAnchors(reference = mmes1, query = mes, reduction = 'rpca', normalization.method = "LogNormalize", dims = 1:30,features = rownames(mmes1))
+
+# saveRDS(anchors,"human_face_mes_allMtoH_anchors_rpca_cellrangerARC-raw_emptyDrops_singlets_27Mar.rds")
+anchors <- readRDS("human_face_mes_allMtoH_anchors_rpca_cellrangerARC-raw_emptyDrops_singlets_27Mar.rds")
+predicted.id <- TransferData(anchorset = anchors, refdata = Idents(mmes1), weight.reduction = mes[['harmony']],dims = 1:30)
+mes$predicted_rpca <- predicted.id$predicted.id
+
+```
+
+Confusion matrix from rpca predicted cell labels
+
+```{r}
+confusionMat_mes <- as.data.frame(table(mes$predicted_rpca,mes$RNA_snn_res.0.8))
+confusionMat_mes <- dcast(confusionMat_mes, Var1 ~ Var2, value.var = "Freq")
+rownames(confusionMat_mes) <- confusionMat_mes[,1]
+confusionMat_mes <- confusionMat_mes[,-1]
+
+pheatmap(t(confusionMat_mes), scale="row")
+messubtype_table<-as.data.frame(apply(confusionMat_mes,2,function(x) rownames(confusionMat_mes)[which.max(x)]))
+messubtype_table[,1] <- make.names(messubtype_table[,1],unique = T)
+mes$subtype1_rpca <- messubtype_table[match(mes$RNA_snn_res.0.8,rownames(messubtype_table)),1]
+
+DimPlot(mes,group.by="RNA_snn_res.0.8",label=T) + NoLegend()
+```
+
+Rpca confusion matrix by subtype1
+
+```{r}
+confusionMat_mes_subtype1_rpca <- confusionMat_mes
+colnames(confusionMat_mes_subtype1_rpca) <- mes$subtype1_rpca[match(colnames(confusionMat_mes_subtype1_rpca),mes$RNA_snn_res.0.8)]
+
+pheatmap(t(confusionMat_mes_subtype1_rpca), scale="row")
+DimPlot(mes,group.by="subtype1_rpca",label=T) + NoLegend()
+```
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mesenchyme_mouse_label_transfer_rpca_confusionMatrix_heatmap2.pdf")
+
+p1 <- pheatmap(t(confusionMat_mes), scale="row",angle_col=45, main="Mesenchyme Mouse vs. Human: RPCA Confusion Matrix")
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))  # Reduce plot size to create margins
+p1
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human Res 0.8 Clusters", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+p2 <- pheatmap(t(confusionMat_mes_subtype1_rpca), scale="row",angle_col=45, main="Mesenchyme Mouse vs. Human: RPCA Confusion Matrix")
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))  # Reduce plot size to create margins
+p2
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human RPCA Subtypes", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+dev.off()
+```
+
+Rpca mesenchyme subtype prediction scores
+
+```{r}
+mes$predicted.score_rpca <- rep(0,ncol(mes))
+identical(rownames(predicted.id),colnames(mes))
+for (cell in 1:nrow(predicted.id)){
+  mes$predicted.score_rpca[cell] <- predicted.id[cell,match(as.character(strsplit2(mes$subtype1_rpca[cell],split="\\.[0-9]")[,1]),
+                                                       gsub("prediction.score.","",colnames(predicted.id)))]
+}
+
+```
+
+```{r}
+mes$subtype1_rpca <- factor(mes$subtype1_rpca)
+p <- SCpubr::do_BoxPlot(sample = mes,
+                        feature = "predicted.score_rpca",
+                        group.by = "subtype1_rpca",
+                        legend.position = "right",
+                        plot.title="RPCA prediction scores")
+p + NoLegend()
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mesenchyme_subtype1_rpca_predictionscores_boxplot.pdf",width=11,height=8.5)
+p + NoLegend()
+dev.off()
+```
+
+Transfer Mouse mesenchyme subtypes to human mesenchyme clusters using cca
+
+```{r}
+
+anchors_cca <- FindTransferAnchors(reference = mmes1, query = mes, reduction = 'cca', normalization.method = "LogNormalize", dims = 1:30,features = rownames(mmes1))
+
+# saveRDS(anchors_cca,"/scr1/users/manchela/Data/human_face_mes_allMtoH_cca_anchors_cellrangerARC-raw_emptyDrops_singlets_27Mar.rds")
+
+anchors_cca <- readRDS("/scr1/users/manchela/Data/human_face_mes_allMtoH_cca_anchors_cellrangerARC-raw_emptyDrops_singlets_27Mar.rds")
+predicted.id <- TransferData(anchorset = anchors_cca, refdata = Idents(mmes1), weight.reduction = mes[['harmony']],dims = 1:30)
+mes$predicted_cca <- predicted.id$predicted.id
+
+```
+
+Confusion matrix from cca predicted cell labels
+
+```{r}
+confusionMat_mes <- as.data.frame(table(mes$predicted_cca,mes$RNA_snn_res.0.8))
+confusionMat_mes <- dcast(confusionMat_mes, Var1 ~ Var2, value.var = "Freq")
+rownames(confusionMat_mes) <- confusionMat_mes[,1]
+confusionMat_mes <- confusionMat_mes[,-1]
+
+pheatmap(t(confusionMat_mes), scale="row")
+messubtype_table<-as.data.frame(apply(confusionMat_mes,2,function(x) rownames(confusionMat_mes)[which.max(x)]))
+messubtype_table[,1] <- make.names(messubtype_table[,1],unique = T)
+mes$subtype1_cca <- messubtype_table[match(mes$RNA_snn_res.0.8,rownames(messubtype_table)),1]
+
+DimPlot(mes,group.by="RNA_snn_res.0.8",label=T) + NoLegend()
+```
+
+cca confusion matrix by subtype1
+
+```{r}
+confusionMat_mes_subtype1_cca <- confusionMat_mes
+colnames(confusionMat_mes_subtype1_cca) <- mes$subtype1_cca[match(colnames(confusionMat_mes_subtype1_cca),mes$RNA_snn_res.0.8)]
+
+pheatmap(t(confusionMat_mes_subtype1_cca), scale="row")
+DimPlot(mes,group.by="subtype1_cca",label=T) + NoLegend()
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mesenchyme_mouse_label_transfer_cca_confusionMatrix_heatmap.pdf")
+
+p1 <- pheatmap(t(confusionMat_mes), scale="row",angle_col=45, main="Mesenchyme Mouse vs. Human: CCA Confusion Matrix")
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))  # Reduce plot size to create margins
+p1
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human Res 0.8 Clusters", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+p2 <- pheatmap(t(confusionMat_mes_subtype1_cca), scale="row",angle_col=45, main="Mesenchyme Mouse vs. Human: CCA Confusion Matrix")
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))  # Reduce plot size to create margins
+p2
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human CCA Subtypes", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+dev.off()
+```
+
+
+cca mesenchyme subtype prediction scores
+
+```{r}
+mes$predicted.score_cca <- rep(0,ncol(mes))
+identical(rownames(predicted.id),colnames(mes))
+for (cell in 1:nrow(predicted.id)){
+  mes$predicted.score_cca[cell] <- predicted.id[cell,match(as.character(strsplit2(mes$subtype1_cca[cell],split="\\.[0-9]")[,1]),
+                                                       gsub("prediction.score.","",colnames(predicted.id)))]
+}
+
+```
+
+```{r}
+mes$subtype1_cca <- factor(mes$subtype1_cca)
+p <- SCpubr::do_BoxPlot(sample = mes,
+                        feature = "predicted.score_cca",
+                        group.by = "subtype1_cca",
+                        legend.position = "right",
+                        plot.title="cca prediction scores")
+p + NoLegend()
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mesenchyme_subtype1_cca_predictionscores_boxplot.pdf",width=11,height=8.5)
+p + NoLegend()
+dev.off()
+```
+
+
+
+```{r}
+DimPlot(mes,group.by="subtype1_rpca",label=T) + NoLegend()
+DimPlot(mes,group.by="subtype1_cca",label=T) + NoLegend()
+
+as.data.frame(table(mes$RNA_snn_res.0.8,mes$subtype1_rpca,mes$subtype1_cca)) %>%filter(Freq!=0)
+
+##differences between rpca and cca
+
+# cluster 7: rpca: cycling, cca: MxP.aLNP
+# cluster 2: rpca: cycling, cca: MxP.surface
+# cluster 16: rpca: e.osteoblast, cca: MxP2
+# cluster 1: rpca: fusion.mes2, cca: palatalShelf1
+# cluster 12: rpca: 	palatal.fusion, cca: palatalShelf1
+
+```
+
+convert seurat obj to h5ad for SAMap
+```{r}
+scRNAseq <- mes
+scRNAseq[["RNA"]] <- as(scRNAseq[["RNA"]],Class = "Assay")
+scRNAseq@assays$RNA@data <- scRNAseq@assays$RNA@counts
+scRNAseq@assays$RNA@scale.data <- matrix(nrow = 0,ncol = 0)
+SaveH5Seurat(scRNAseq, filename = "/scr1/users/manchela/Data/Multiome/Humanface/GEX/SAMap/human_mes_rawData_27Mar.h5Seurat")
+Convert("/scr1/users/manchela/Data/Multiome/Humanface/GEX/SAMap/human_mes_rawData_27Mar.h5Seurat", dest = "h5ad")
+```
+
+
+SAMap for further correcting mesenchyme subtype annotations
+
+```{r}
+MappingTable <- read.table("/scr1/users/manchela/Data/Multiome/Humanface/GEX/SAMap/SAMapOutput_MappingTable_human-mouse_mes_27Mar.txt", sep = '\t',header = 1,row.names = 1)
+MappingTable <-as.matrix(MappingTable[grep("mo",rownames(MappingTable)),grep("hu",colnames(MappingTable))])
+
+human.celltype.match <- data.frame(x=paste0("hu_",0:(length(levels(mes$RNA_snn_res.0.8))-1)),y=levels(mes$RNA_snn_res.0.8))
+mouse.celltype.match <- data.frame(x=paste0("mo_",0:(length(levels(mmes$annotation))-1)),y=levels(mmes$annotation))
+
+rownames(MappingTable) <- mouse.celltype.match$y[match(rownames(MappingTable),mouse.celltype.match$x)]
+colnames(MappingTable) <- human.celltype.match$y[match(colnames(MappingTable),human.celltype.match$x)]
+
+
+p1 <- pheatmap(t(MappingTable),scale="row",angle_col=45, main="Mesenchyme Mouse vs. Human: SAMap")
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))  # Reduce plot size to create margins
+p1
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human Res 0.8 Clusters", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+
+
+```
+
+plotting SAMap results
+```{r}
+
+SAMap_table<-as.data.frame(apply(MappingTable,2,function(x) rownames(MappingTable)[which.max(x)]))
+SAMap_table[,1] <- make.names(SAMap_table[,1],unique=T)
+mes$subtype1_SAMap <- as.character(SAMap_table[match(mes$RNA_snn_res.0.8,rownames(SAMap_table)),1])
+
+DimPlot(mes,group.by="subtype1_SAMap",label=T)+NoLegend()
+
+colnames(MappingTable) <- mes$subtype1_SAMap[match(colnames(MappingTable),as.character(mes$RNA_snn_res.0.8))]
+p1 <- pheatmap(t(MappingTable),scale="row",angle_col=45, main="Mesenchyme Mouse vs. Human: SAMap")
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))  # Reduce plot size to create margins
+p1
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human SAMap Subtypes", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mesenchyme_SAMap_matrix_heatmap.pdf")
+
+colnames(MappingTable) <- mes$RNA_snn_res.0.8[match(colnames(MappingTable),as.character(mes$subtype1_SAMap))]
+p1 <- pheatmap(t(MappingTable),scale="row",angle_col=45, main="SAMap - Mesenchyme Mouse vs. Human")
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))  # Reduce plot size to create margins
+p1
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human Res 0.8 Clusters", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+
+colnames(MappingTable) <- mes$subtype1_SAMap[match(colnames(MappingTable),as.character(mes$RNA_snn_res.0.8))]
+p1 <- pheatmap(t(MappingTable),scale="row",angle_col=45, main="SAMap - Mesenchyme Mouse vs. Human")
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))  # Reduce plot size to create margins
+p1
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human SAMap Subtypes", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+dev.off()
+```
+
+```{r}
+as.data.frame(table(mes$RNA_snn_res.0.8,mes$subtype1_rpca,mes$subtype1_cca,mes$subtype1_SAMap)) %>% filter(Freq!=0)
+
+DimPlot(mes,group.by="RNA_snn_res.0.8",label=T)+NoLegend()
+DimPlot(mes,group.by="subtype1_rpca",label=T)+NoLegend()
+
+# Variability across annotation methods
+# cluster 1: rpca: fusion.mes2, cca: palatalShelf1, SAMap: fusion.mes2
+# cluster 2: rpca: cycling, cca: MxP.surface, SAMap: immune
+# cluster 4: rpca: MandibularArch, cca: MandibularArch, SAMap: chondrocyte
+# cluster 6: rpca: MxP.surface, cca: MxP.surface, SAMap: muscle.mes
+# cluster 7: rpca: cycling, cca: MxP.aLNP, SAMap: cycling
+# cluster 12: rpca: 	palatal.fusion, cca: palatalShelf1, SAMap: cycling
+# cluster 16: rpca: e.osteoblast, cca: MxP2, SAMap: cycling
+# cluster 18: rpca: 	palatal.fusion, cca: palatal.fusion, SAMap: cycling
+```
+
+Finding marker genes for human and mouse subtypes for GeneOverlap
+
+```{r}
+
+mes_marker_genes <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/SigGenes_Mes_Res0.8Clusters.xlsx")
+
+# match with mouse one-to-one orthologs
+mes_marker_genes_mouseOverlap <- mes_marker_genes[which(mes_marker_genes$gene%in%rownames(mmes1)),]
+
+# get top 100 marker genes for each human mesenchyme cluster
+top100_human_mes_marker_genes <- list()
+for (i in unique(mes_marker_genes$cluster)){
+  top100_human_mes_marker_genes[[i]] <- mes_marker_genes_mouseOverlap[which(mes_marker_genes_mouseOverlap$cluster==i),] %>% filter(p_val_adj < 0.05)%>%
+    top_n(100, avg_log2FC)%>% pull(gene)
+}
+
+
+# find marker genes for each mouse mesenchyme subtype
+Idents(mmes1) <- mmes1$annotation
+mouse_mes_marker_genes <- FindAllMarkers(mmes1, assay = "RNA" ,logfc.threshold = 0.25, test.use = "wilcox", min.pct = 0.1, 
+                                         min.diff.pct = -Inf, node = NULL, verbose = TRUE,
+                                         only.pos = TRUE, max.cells.per.ident = Inf, random.seed = 1,
+                                         latent.vars = NULL, min.cells.feature = 3, min.cells.group = 3,
+                                         pseudocount.use = 1, return.thresh = 0.01)
+
+mouse_mes_marker_genes <- mutate(mouse_mes_marker_genes,pct.diff=pct.1-pct.2)
+mouse_mes_marker_genes$mo_gene <- annotLookup_ortho_one2one$input_gene[match(mouse_mes_marker_genes$gene,rownames(annotLookup_ortho_one2one))]
+# openxlsx::write.xlsx(mouse_mes_marker_genes,"Craniofacial-scRNAseqManuscript/final-tables/Mouse_SigGenes_mes_SubTypes.xlsx")
+mouse_mes_marker_genes <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/Mouse_SigGenes_mes_SubTypes.xlsx")
+
+# get top 100 marker genes for each mouse mesenchyme subtype
+top100_mouse_mes_marker_genes <- list()
+for (i in unique(mouse_mes_marker_genes$cluster)){
+  top100_mouse_mes_marker_genes[[i]] <- mouse_mes_marker_genes[which(mouse_mes_marker_genes$cluster==i),] %>%
+    filter(p_val_adj < 0.05)%>%top_n(100, avg_log2FC)%>% pull(gene)
+}
+
+
+```
+
+GeneOverlap for mesenchyme subtypes
+
+```{r}
+
+gs.markers= length(intersect(rownames(annotLookup_ortho_one2one),mes_marker_genes$gene))
+
+names(top100_human_mes_marker_genes)
+gom.obj <- newGOM(top100_human_mes_marker_genes, top100_mouse_mes_marker_genes, gs.markers)
+
+mes_geneoverlap_pval <- getMatrix(gom.obj,name = "pval")
+mes_geneoverlap_pval <- t(apply(mes_geneoverlap_pval,1,function(x) p.adjust(x, method = "BH")))
+mes_geneoverlap_pval <- -log(mes_geneoverlap_pval,10)
+formatted_values <- t(apply(mes_geneoverlap_pval,1,function(x) ifelse(as.numeric(x) < -log(0.05,10), "NS", sprintf("%.2f", x))))
+
+
+p <- pheatmap(
+  mat = mes_geneoverlap_pval,
+  clustering_distance_rows = "euclidean",
+  clustering_distance_cols = "euclidean",
+  clustering_method = "complete",
+  display_numbers = formatted_values,
+  scale="row",
+  fontsize_row = 15,
+  fontsize_col = 15,
+  number_color="white",
+  color = viridis(n = 50, option = "C", direction = -1),
+  main = "Top 100 DEGs: Mesenchyme Cell Subtypes",
+)
+
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))
+p
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human Subtypes", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+```
+
+```{r}
+
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mesenchyme_Res0.8_GeneOverlap_human_mouse_top100genes_heatmap.pdf",height=11,width=8.5)
+
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))  # Reduce plot size to create margins
+p
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human Res 0.8 Clusters", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+dev.off()
+```
+
+Finalizing Mesenchyme Subtype annotations (from rpca, cca, SAMap, GeneOverlap, and functional annotation)
+
+```{r}
+
+# cluster 1: rpca: fusion.mes2, cca: palatalShelf1, SAMap: fusion.mes2 -----> fusion.mes2
+# cluster 2: rpca: cycling, cca: MxP.surface, SAMap: immune -----> 
+# cluster 4: rpca: MandibularArch, cca: MandibularArch, SAMap: chondrocyte -----> MandibularArch
+# cluster 6: rpca: MxP.surface, cca: MxP.surface, SAMap: muscle.mes -----> MxP.surface
+# cluster 7: rpca: cycling, cca: MxP.aLNP, SAMap: cycling -----> MxP.aLNP
+# cluster 12: rpca: 	palatal.fusion, cca: palatalShelf1, SAMap: cycling -----> palatal.fusion
+# cluster 16: rpca: e.osteoblast, cca: MxP2, SAMap: cycling -----> muscle.mes
+# cluster 18: rpca: 	palatal.fusion, cca: palatal.fusion, SAMap: cycling -----> palatal.fusion
+
+
+mes$subtype_final <- as.character(mes$subtype1_rpca)
+mes$subtype_final[which(mes$RNA_snn_res.0.8==2)] <- 'palatal.fusion.4'
+mes$subtype_final[which(mes$RNA_snn_res.0.8==7)] <- 'MxP.aLNP'
+mes$subtype_final[which(mes$RNA_snn_res.0.8==16)] <- 'muscle.mes'
+mes$subtype_final[which(mes$RNA_snn_res.0.8==10)] <- 'MxP2'
+mes$subtype_final[which(mes$RNA_snn_res.0.8==19)] <- 'MxP.surface.1'
+
+
+DimPlot(mes,group.by="RNA_snn_res.0.8",label=T) + NoLegend()
+
+DimPlot(mes,group.by="subtype_final",label=T) + NoLegend()
+
+mes$subtype_final <-factor(mes$subtype_final,levels=sort(unique(mes$subtype_final)))
+
+```
+
+
+```{r}
+as.data.frame(table(mes$RNA_snn_res.0.8,mes$subtype_final)) %>% filter(Freq!=0) %>% arrange(Var1)
+```
+
+assigning colors to subtypes
+dimplot for final subtype labels
+```{r}
+mes_colors <- DiscretePalette_scCustomize(num_colors = 24,palette = "stepped")
+mes_colors <- c(mes_colors,"#E47D00")
+names(mes_colors) <- levels(mes$subtype_final)
+
+mes$color <- as.character(mes_colors)[match(mes$subtype_final,names(mes_colors))]
+mes_plot_colors <- mes$color 
+names(mes_plot_colors) <- mes$subtype_final
+  
+DimPlot_scCustom(mes, colors_use = mes_plot_colors, group.by="subtype_final",label=F)
+# p <- SCpubr::do_DimPlot(mes, group.by="subtype_final",
+#                         colors.use=mes_plot_colors,
+#                         repel=T,
+#                         label = TRUE,
+#                         label.size = 3,
+#                         legend.position = "right")
+# p
+```
+
+
+
+
+```{r}
+mes$subtype_final_reduced <- strsplit2(as.character(mes$subtype_final),split="\\.[0-9]$")[,1]
+mes$subtype_final_reduced <- factor(mes$subtype_final_reduced, levels= sort(unique(mes$subtype_final_reduced)))
+
+mes_reduced_colors <- mes_colors[match(as.character(unique(mes$subtype_final_reduced)), strsplit2(names(mes_colors),split="\\.[0-9]$")[,1])]
+
+p1 <- DimPlot_scCustom(mes, colors_use = mes_plot_colors, group.by="subtype_final",label=T,label.box=T,repel=T) +
+  scale_fill_manual(values = rep("white",length(unique(mes$subtype_final))))
+
+p2 <- DimPlot_scCustom(mes, colors_use = mes_reduced_colors, group.by="subtype_final_reduced",label=T,label.box=T,repel=T) +
+  scale_fill_manual(values = rep("white",length(unique(mes$subtype_final_reduced))))
+
+p1
+p2
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mesenchyme_subtype_final_annotations_DimPlots.pdf",width=11,height=8.5)
+p1
+p2
+dev.off()
+```
+
+bar plot by stage 
+```{r}
+mes_subtype_colors <- unique(mes_plot_colors)
+names(mes_subtype_colors) <- unique(names(mes_plot_colors))
+
+stage_colors <- viridis_plasma_dark_high[match(1:6,cut(1:length(viridis_plasma_dark_high), breaks = 6,labels=1:6))]
+names(stage_colors) <- levels(mes$stage)
+
+mes$subtype_final <- factor(mes$subtype_final, levels=names(sort(table(mes$subtype_final),decreasing = T)))
+
+p1 <- SCpubr::do_BarPlot(mes, 
+                   group.by = "stage",
+                   split.by = "subtype_final",
+                   position = "fill",
+                   flip = FALSE, 
+                   legend.position = "right",
+                   colors.use = stage_colors)
+p1
+
+p2 <- SCpubr::do_BarPlot(mes, 
+                   group.by = "stage",
+                   split.by = "subtype_final",
+                   position = "stack",
+                   flip = FALSE,
+                   legend.position = "right",
+                   colors.use = stage_colors)
+p2
+
+
+p3 <- SCpubr::do_BarPlot(mes, 
+                   group.by = "subtype_final",
+                   split.by = "stage",
+                   position = "fill",
+                   flip = FALSE, 
+                   legend.position = "right",
+                   colors.use = mes_subtype_colors)
+p3
+
+p4 <- SCpubr::do_BarPlot(mes, 
+                   group.by = "subtype_final",
+                   split.by = "stage",
+                   position = "stack",
+                   flip = FALSE, 
+                   legend.position = "right",
+                   colors.use = mes_subtype_colors)
+p4
+
+```
+
+```{r}
+subtype_subset <- c("cartilage","fusion.mes2","l.Osteoblast","LNP","MandibularArch","muscle.mes","MxP.aLNP","MxP.surface","MxP2",
+                    "palatal.fusion","palatalShelf1","palatalShelf2","pLNP2")
+mes_subset <- mes[,which(mes$subtype_final%in%subtype_subset)]
+mes_subset$subtype_final <- factor(mes_subset$subtype_final, levels=names(sort(table(mes_subset$subtype_final),decreasing = T)))
+```
+
+
+```{r}
+
+mes_subtype_colors_subset <- mes_subtype_colors[match(subtype_subset,names(mes_subtype_colors))]
+
+p5 <- SCpubr::do_BarPlot(mes_subset, 
+                   group.by = "stage",
+                   split.by = "subtype_final",
+                   position = "fill",
+                   flip = FALSE, 
+                   legend.position = "right",
+                   colors.use = stage_colors)
+p5
+
+p6 <- SCpubr::do_BarPlot(mes_subset, 
+                   group.by = "stage",
+                   split.by = "subtype_final",
+                   position = "stack",
+                   flip = FALSE,
+                   legend.position = "right",
+                   colors.use = stage_colors)
+p6
+
+
+p7 <- SCpubr::do_BarPlot(mes_subset, 
+                   group.by = "subtype_final",
+                   split.by = "stage",
+                   position = "fill",
+                   flip = FALSE, 
+                   legend.position = "right",
+                   colors.use = mes_subtype_colors_subset)
+p7
+
+p8 <- SCpubr::do_BarPlot(mes_subset, 
+                   group.by = "subtype_final",
+                   split.by = "stage",
+                   position = "stack",
+                   flip = FALSE, 
+                   legend.position = "right",
+                   colors.use = mes_subtype_colors_subset)
+p8
+
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mes_subtype_final_stage_barplot.pdf",width=11,height=8.5)
+p1
+p2
+p3
+p4
+p5
+p6
+p7
+p8
+dev.off()
+```
+
+```{r}
+tf_table <- read.table("human_tf_Lambertetal_PMID29425488.txt",sep="\t",header = T)
+tf_table$gene.name <- mes_annotLookup$hgnc_symbol[match(tf_table$Human_TF,mes_annotLookup$ensembl_gene_id)]
+```
+
+plotting top tf DEGs
+```{r}
+sig_genes_mes_subtypes <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/SigGenes_Mes_Res0.8Clusters.xlsx")
+sig_genes_mes_subtypes$cluster <- mes$subtype_final[match(sig_genes_mes_subtypes$cluster,mes$RNA_snn_res.0.8)]
+# openxlsx::write.xlsx(sig_genes_mes_subtypes,"Craniofacial-scRNAseqManuscript/final-tables/SigGenes_mes_SubTypes_8Apr.xlsx")
+sig_genes_mes_subtypes$ensemblID <- mes_annotLookup$ensembl_gene_id[match(sig_genes_mes_subtypes$Entrez,mes_annotLookup$entrezgene_id)]
+
+sig_genes_mes_subtypes$TF <- "No"
+sig_genes_mes_subtypes$TF[which(sig_genes_mes_subtypes$ensemblID%in%tf_table$Human_TF)] <- "Yes"
+
+sig_genes_mes_subtypes_protein <- sig_genes_mes_subtypes %>% filter(biotype == "protein_coding",TF=="Yes")
+
+mes$subtype_final <- factor(mes$subtype_final,levels=sort(unique(mes$subtype_final)))
+
+top_celtype <- sig_genes_mes_subtypes_protein %>% 
+  mutate(cluster = factor(cluster, levels = levels(mes$subtype_final))) %>% 
+  group_by(cluster) %>% top_n(5, avg_log2FC) %>% arrange(cluster)
+
+top100_celltype <- sig_genes_mes_subtypes_protein %>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% top_n(100, avg_log2FC)
+top100pval_celltype <- subset(top100_celltype, rowSums(top100_celltype[5] < 0.05) > 0)
+
+top50_celltype <- sig_genes_mes_subtypes_protein%>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% top_n(50, avg_log2FC)
+top50pval_celltype <- subset(top50_celltype, rowSums(top50_celltype[5] < 0.05) > 0)
+```
+
+```{r}
+sig_genes_mes_subtypes_protein <- sig_genes_mes_subtypes_protein[order(sig_genes_mes_subtypes_protein$cluster),]
+
+top_initial_mes_subtype <- sig_genes_mes_subtypes_protein %>% group_by(cluster) %>% top_n(5, avg_log2FC)
+
+Idents(mes) <- mes$subtype_final
+p <- DotPlot(object = mes, features = unique(top_initial_mes_subtype$gene))+ coord_flip()+ RotatedAxis()
+df <- data.frame(Gene = p$data$features.plot, avg.exp = p$data$avg.exp.scaled, pct.exp = p$data$pct.exp, cluster = p$data$id)
+
+out <- DotPlot_scCustom(seurat_object = mes, features = unique(top_initial_mes_subtype$gene), colors_use = viridis_plasma_dark_high,flip_axes=T,
+                         remove_axis_titles = T,x_lab_rotate = T) + theme(axis.text.x = element_text(size = 10),axis.text.y = element_text(size = 6, face = "italic"))
+out
+
+Idents(mes_subset) <- factor(mes_subset$subtype_final,levels=subtype_subset[na.omit(match(levels(mes$subtype_final),subtype_subset))])
+out2 <- DotPlot_scCustom(seurat_object = mes_subset, 
+                         features = unique(top_initial_mes_subtype$gene[which(top_initial_mes_subtype$cluster%in%subtype_subset)]),
+                         colors_use = viridis_plasma_dark_high,flip_axes=T,remove_axis_titles = T,x_lab_rotate = T) + 
+  theme(axis.text.x = element_text(size = 10),axis.text.y = element_text(size = 6, face = "italic"),
+        legend.position = "bottom",legend.justification = "center", legend.title = element_text(size = 10, hjust=0.5),
+        legend.text = element_text(size = 10))+guides(color = guide_colorbar(title.position = "top",title = "Average Expression"),
+                                                      size = guide_legend(title.position = "top",title = "Percent Expressed")) 
+out2
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/mes_subtype_final_TF_markergenes_dotplot.pdf",width=8,height=11)
+out2
+dev.off()
+
+pdf("Craniofacial-scRNAseqManuscript/final-figs/mes_subtype_final_TF_markergenes_dotplot_all.pdf",width=14,height=11)
+out
+dev.off()
+
+```
+
+plotting cell cycle scores
+```{r}
+mes$S.Score.adjust <- mes$S.Score + abs(min(mes$S.Score))
+mes$G2M.Score.adjust <- mes$G2M.Score + abs(min(mes$G2M.Score))
+
+mes$cellcycle.ratio <- mes$S.Score.adjust / mes$G2M.Score.adjust
+VlnPlot_scCustom(seurat_object = mes, features = "cellcycle.ratio", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final",colors_use = mes_plot_colors) +
+  ylim(c(0,5)) + NoLegend() + geom_hline(yintercept=median(mes$cellcycle.ratio),linetype=2)
+
+VlnPlot_scCustom(seurat_object = mes, features = "S.Score", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final",colors_use = mes_plot_colors) + NoLegend()  + geom_hline(yintercept=median(mes$S.Score),linetype=2)
+
+VlnPlot_scCustom(seurat_object = mes, features = "G2M.Score", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final",colors_use = mes_plot_colors) + NoLegend()  + geom_hline(yintercept=median(mes$G2M.Score),linetype=2)
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mesenchyme_subtype_final_CellCycle_VlnPlot.pdf",width=11,height=8.5)
+VlnPlot_scCustom(seurat_object = mes, features = "cellcycle.ratio", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final",colors_use = mes_plot_colors) +
+  ylim(c(0,5)) + NoLegend() + geom_hline(yintercept=median(mes$cellcycle.ratio),linetype=2)
+
+VlnPlot_scCustom(seurat_object = mes, features = "S.Score", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final",colors_use = mes_plot_colors) + NoLegend()  + geom_hline(yintercept=median(mes$S.Score),linetype=2)
+
+VlnPlot_scCustom(seurat_object = mes, features = "G2M.Score", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final",colors_use = mes_plot_colors) + NoLegend()  + geom_hline(yintercept=median(mes$G2M.Score),linetype=2)
+dev.off()
+```
+
+hox genes
+```{r}
+anterior_hox <- c("HOXA1", "HOXA2", "HOXA3", "HOXB1", "HOXB2", "HOXB3", "HOXD1", "HOXD3")
+central_hox <- c("HOXA4", "HOXA5", "HOXA6", "HOXA7", "HOXB4", "HOXB5", "HOXB6", "HOXB7", "HOXB8", "HOXC4", "HOXC5", "HOXC6", "HOXC8", "HOXD4", "HOXD8")
+posterior_hox <-c("HOXA9", "HOXA10", "HOXA11", "HOXA13", "HOXB9", "HOXB13", "HOXC9", "HOXC10", "HOXC11", "HOXC12", "HOXC13", "HOXD9", "HOXD10", "HOXD11", "HOXD12", "HOXD13")
+
+mes <- AddModuleScore(mes, list(anterior_hox), name = "Anterior_ModuleScore")
+mes <- AddModuleScore(mes, list(central_hox), name = "Central_ModuleScore")
+mes <- AddModuleScore(mes, list(posterior_hox), name = "Posterior_ModuleScore")
+
+
+VlnPlot_scCustom(seurat_object = mes, features = "Anterior_ModuleScore1", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final",colors_use = mes_plot_colors) + NoLegend()
+
+VlnPlot_scCustom(seurat_object = mes, features = "Central_ModuleScore1", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final",colors_use = mes_plot_colors) + NoLegend()
+
+VlnPlot_scCustom(seurat_object = mes, features = "Posterior_ModuleScore1", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final",colors_use = mes_plot_colors) + NoLegend()
+
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mesenchyme_subtype_final_HoxModules_VlnPlot.pdf",width=11,height=8.5)
+VlnPlot_scCustom(seurat_object = mes, features = "Anterior_ModuleScore1", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final",colors_use = mes_plot_colors) + NoLegend()
+
+VlnPlot_scCustom(seurat_object = mes, features = "Central_ModuleScore1", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final",colors_use = mes_plot_colors) + NoLegend()
+
+VlnPlot_scCustom(seurat_object = mes, features = "Posterior_ModuleScore1", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final",colors_use = mes_plot_colors) + NoLegend()
+Stacked_VlnPlot(mes,features=c("Anterior_ModuleScore1","Central_ModuleScore1","Posterior_ModuleScore1"),pt.size = 0,group.by="subtype_final", colors_use = mes_plot_colors,x_lab_rotate = 45)
+dev.off()
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mesenchyme_subtype_final_HoxGenes_VlnPlot.pdf",width=11,height=8.5)
+p <- Stacked_VlnPlot(seurat_object = mes, features = anterior_hox,pt.size = 0,group.by="subtype_final",x_lab_rotate = 45,colors_use = mes_plot_colors)+ NoLegend() +
+  plot_annotation(title = "Anterior HOX Genes", theme = theme(
+    plot.title = element_text(hjust = 0.5,size=16)
+  ))
+
+p
+```
+
+GeneOverlap for mes subtypes
+
+```{r}
+
+gs.markers= length(intersect(rownames(annotLookup_ortho_one2one),mes_marker_genes$gene))
+
+names(top100_human_mes_marker_genes) <- mes$subtype_final[match(names(top100_human_mes_marker_genes),mes$RNA_snn_res.0.8)]
+
+names(top100_human_mes_marker_genes) <- paste0("human ",names(top100_human_mes_marker_genes))
+names(top100_mouse_mes_marker_genes) <- paste0("mouse ",names(top100_mouse_mes_marker_genes))
+gom.obj <- newGOM(top100_human_mes_marker_genes, top100_mouse_mes_marker_genes, gs.markers)
+
+mes_geneoverlap_pval <- getMatrix(gom.obj,name = "pval")
+mes_geneoverlap_odds <- getMatrix(gom.obj,name = "odds.ratio")
+formatted_values <- t(apply(mes_geneoverlap_pval,1,function(x) ifelse(as.numeric(x) > 0.05, "NS", sprintf("%.2e", x))))
+
+
+p <- pheatmap(
+  mat = mes_geneoverlap_odds,
+  cluster_cols = T,
+  cluster_rows = T,
+  display_numbers = formatted_values,
+  scale="row",
+  fontsize_row = 13,
+  fontsize_col = 13,fontsize = 12,
+  fontsize_number = 8,
+  number_color="white",angle_col = 45,
+  color = viridis(n = 50, option = "C", direction = -1),
+  main = "Top 100 DEGs: Human vs. Mouse Mes Subtypes",
+)
+
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))
+p
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human Subtypes", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mes_GeneOverlap_human_mouse_subtype_final_top100DEGs_heatmap.pdf",width=15,height=8.5)
+
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))
+p
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 16)) # X-axis title
+grid.text("Human Subtypes", x = -0.02, rot = 90, gp = gpar(fontsize = 16)) # Y-axis title
+
+drawHeatmap(gom.obj, grid.col="Reds",note.col="white")
+dev.off()
+```
+
+```{r}
+mes_subtype_intersect <- getNestedList(gom.obj, name="intersection")
+
+mes_subtype_intersect_longer <- map_df(names(mes_subtype_intersect), function(mouse_cond) {
+  human_cells <- names(mes_subtype_intersect[[mouse_cond]])
+  genes <- unlist(mes_subtype_intersect[[mouse_cond]])
+  
+  tibble(
+    mouse_celltype = rep(mouse_cond, length(genes)),
+    human_celltype = rep(human_cells, sapply(mes_subtype_intersect[[mouse_cond]], length)),
+    gene = genes
+  )
+})
+
+
+human_mouse_shared_mes <- mes_subtype_intersect_longer %>%
+  group_by(mouse_celltype, human_celltype) %>%
+  dplyr::summarize(shared_gene_count = n(), .groups = "drop")
+
+human_mouse_shared_mes <- as.data.frame(human_mouse_shared_mes)
+human_mouse_shared_mes$pval <- rep(NA,nrow(human_mouse_shared_mes))
+for (i in 1:nrow(human_mouse_shared_mes)){
+  human_mouse_shared_mes$pval[i] <- mes_geneoverlap_pval[which(rownames(mes_geneoverlap_pval)==human_mouse_shared_mes$human_celltype[i]),which(colnames(mes_geneoverlap_pval)==human_mouse_shared_mes$mouse_celltype[i])]
+}
+
+human_mouse_shared_mes$pval <- as.numeric(human_mouse_shared_mes$pval)
+human_mouse_shared_mes$sig <- human_mouse_shared_mes$pval
+human_mouse_shared_mes$sig[which(human_mouse_shared_mes$pval>0.05)] <- ""
+human_mouse_shared_mes$sig[which(human_mouse_shared_mes$pval<0.05 & 
+                                   human_mouse_shared_mes$pval>0.001)] <- "*"
+human_mouse_shared_mes$sig[which(human_mouse_shared_mes$pval<0.001 & 
+                                   human_mouse_shared_mes$pval>0.0001)] <- "**"
+human_mouse_shared_mes$sig[which(human_mouse_shared_mes$pval<0.0001)] <- "***"
+
+human_mouse_shared_mes$pval_format <- ifelse(as.numeric(human_mouse_shared_mes$pval) > 0.05, "NS", sprintf("%.2e", human_mouse_shared_mes$pval))
+
+
+mes_colors_alluvial <- mes_colors
+names(mes_colors_alluvial) <- paste0("human ",names(mes_colors_alluvial))
+
+p <- ggplot(human_mouse_shared_mes[which(human_mouse_shared_mes$shared_gene_count>=5),],
+            aes(axis1 = mouse_celltype, axis2 = human_celltype,
+                y = shared_gene_count,label=pval_format)) +  
+  geom_alluvium(aes(fill = human_celltype), width = 0.2, alpha = 0.8) +
+  geom_stratum(aes(fill = human_celltype)) +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum))) +
+  geom_text(stat = "flow", nudge_x = 0.2,size=3,hjust=-0.05) +
+  # scale_fill_viridis_d() +
+  # scale_fill_brewer(type = "qual", palette = "Set3") +
+  scale_fill_manual(values = mes_colors_alluvial, na.value = NA) + 
+  theme_minimal() +
+  labs(title = "Gene Overlap Between Mouse & Human Mesenchyme Subtypes",
+       y="") +
+  NoLegend() +
+   theme(panel.grid.major = element_blank(), 
+         panel.grid.minor = element_blank(),
+         plot.title = element_text(hjust=0.5),
+         axis.text.x = element_blank(),
+         axis.text.y = element_blank())
+
+p
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Human_Mouse_Mes_Subtypes_>5geneoverlap_AlluvialPlot.pdf",width=11,height=10)
+p
+dev.off()
+```
+
+
+
+plotting SAMap output
+```{r}
+MappingTable <- read.table("/scr1/users/manchela/Data/Multiome/Humanface/GEX/SAMap/SAMapOutput_MappingTable_human-mouse_mes_27Mar.txt", sep = '\t',header = 1,row.names = 1)
+MappingTable <-as.matrix(MappingTable[grep("mo",rownames(MappingTable)),grep("hu",colnames(MappingTable))])
+
+human.celltype.match <- data.frame(x=colnames(MappingTable),y=strsplit2(colnames(MappingTable),split="_")[,2])
+mouse.celltype.match <- data.frame(x=rownames(MappingTable),y=strsplit2(rownames(MappingTable),split="_")[,2])
+
+
+mes_annot_table <- as.data.frame(cbind(as.numeric(mes$RNA_snn_res.0.8)-1,as.character(mes$subtype_final)))
+mes_annot_table <- mes_annot_table[-which(duplicated(mes_annot_table)),]
+
+mouse.celltype.match <- data.frame(x=paste0("mo_",0:(length(levels(mmes$annotation))-1)),y=levels(mmes$annotation))
+
+colnames(MappingTable) <- paste0("human ", mes_annot_table$V2[match(human.celltype.match$y,mes_annot_table$V1)])
+
+rownames(MappingTable) <-paste0("mouse ",mouse.celltype.match$y[match(rownames(MappingTable),mouse.celltype.match$x)])
+
+MappingTable <- t(MappingTable)
+
+p2 <- pheatmap(MappingTable,display_numbers = round(MappingTable,2),scale="row", main="SAMap - Mesenchyme Mouse vs. Human",angle_col = "45",color = viridis(n = 50, option = "C", direction = -1),number_color = "white",fontsize_number = 10)
+
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))  # Reduce plot size to create margins
+p2
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human Subtypes", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mes_SAMap_human_mouse_subtype_final_heatmap.pdf",width=15,height=8.5)
+
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))  # Reduce plot size to create margins
+p2
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human Subtypes", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+dev.off()
+```
+
+functional annotation using subtype_final labels
+```{r}
+mes_annot_list <- readRDS("human_face_mes_Res0.8Clusters_functional-annotation_lists_27Mar.rds")
+for (i in names(mes_annot_list)){
+  mes_annot_list[[i]]@compareClusterResult$Cluster <- as.character(mes_annot_list[[i]]@compareClusterResult$Cluster)
+  mes_annot_list[[i]]@compareClusterResult$Cluster <- 
+    mes$subtype_final[match(mes_annot_list[[i]]@compareClusterResult$Cluster,mes$RNA_snn_res.0.8)]
+  mes_annot_list[[i]]@compareClusterResult <- mes_annot_list[[i]]@compareClusterResult %>% arrange(Cluster)
+}
+
+BPclusterplot <- mes_annot_list$BP
+options(enrichplot.colours = c("blue", "grey"))
+p1 <- dotplot(BPclusterplot, showCategory = 5, font.size = 6, title = "GO: Biological Process", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1) )
+
+CCclusterplot <- mes_annot_list$CC
+options(enrichplot.colours = c("orange", "grey"))
+p2 <- dotplot(CCclusterplot, showCategory = 5, font.size = 6, title = "GO: Cellular Component", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1))
+
+MFclusterplot <- mes_annot_list$MF
+options(enrichplot.colours = c("green", "grey"))
+p3 <- dotplot(MFclusterplot, showCategory = 5, font.size = 6, title = "GO: Molecular Function", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1))
+
+Pathwayclusterplot <- mes_annot_list$Reactome
+options(enrichplot.colours = c("brown", "grey"))
+p4 <- dotplot(Pathwayclusterplot, showCategory = 5, font.size = 6, title = "Reactome Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1))
+
+KEGGclusterplot <- mes_annot_list$KEGG
+options(enrichplot.colours = c("yellow", "grey"))
+p5 <- dotplot(KEGGclusterplot, showCategory = 5, font.size = 6, title = "KEGG Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1))
+
+DOclusterplot <- mes_annot_list$DisGeNet
+options(enrichplot.colours = c("red", "grey"))
+p6 <- dotplot(DOclusterplot, showCategory = 5, font.size = 6, title = "DisGeNet", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1))
+
+p1
+p2
+p3
+p4
+p5
+p6
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mesenchyme_subtype_final_Top5_FunctionalEnrichment_dotplot.pdf",width=8.5,height=16)
+p1
+p2
+p3
+p4
+p5
+p6
+dev.off()
+```
+
+```{r}
+pdf(file = "Craniofacial-scRNAseqManuscript/final-figs/Mesenchyme_subtype_final_Top5_FunctionalEnrichment_dotplot_plotgrid.pdf", w = 17, h = 22)
+cowplot::plot_grid(p1, p2, p3, p4, p5, p6, ncol=2, labels=LETTERS[1:6])
+dev.off()
+```
+
+```{r}
+options(enrichplot.colours = c("red", "grey"))
+p <- dotplot(DOclusterplot, showCategory = 5, font.size = 6, title = "DisGeNet", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1)) + coord_flip()
+p
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mesenchyme_subtype_final_Top5_DGN_dotplot.pdf",width=13,height=8)
+p
+dev.off()
+```
+
+
+Elbow plot for optimal number of clusters
+```{r}
+set.seed(123)
+x=mmes1@assays$RNA$scale.data
+diss <- Rfast::Dist(as.matrix(x))
+
+k.max=100
+v <- rep(0, k.max)
+for (i in 1:k.max) {
+  clust <- kmeans(x, i)
+  v[i] <- factoextra:::.get_withinSS(diss, clust$cluster)
+  cat(i)
+}
+
+
+df <- data.frame(clusters = as.factor(1:k.max), y = v, 
+                 stringsAsFactors = TRUE)
+
+ylab <- "Total Within Sum of Square"
+p <- ggpubr::ggline(df, x = "clusters", y = "y", group = 1, 
+                    color = "steelblue", ylab = ylab, xlab = "Number of clusters k", 
+                    main = "Mesenchyme: Optimal number of clusters")
+
+saveRDS(p,"human_face_mouse_mes_ElbowPlot_data_27Mar.rds")
+```
+
+```{r}
+
+p <- readRDS("human_face_mouse_mes_ElbowPlot_data_27Mar.rds")
+p + scale_x_discrete(breaks = seq(0, max(as.numeric(as.character(p$data$clusters))), by = 5))+
+  geom_vline(xintercept = elbow_point(as.numeric(p$data$clusters),as.numeric(p$data$y))$x, linetype=2)
+
+elbow_point(as.numeric(p$data$clusters),as.numeric(p$data$y))
+# x= 22 clusters
+
+apply(mmes1@meta.data[,grep("RNA_snn_res",colnames(mmes1@meta.data))],2,function(x) length(unique(x)))
+# choosing resolution=0.8 (20 clusters)
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Mesenchyme_Subclustering_OptimalClusters_ElbowPlot.pdf",width=11,height=8.5)
+p + scale_x_discrete(breaks = seq(0, max(as.numeric(as.character(p$data$clusters))), by = 5))+
+  geom_vline(xintercept = elbow_point(as.numeric(p$data$clusters),as.numeric(p$data$y))$x, linetype=2)
+dev.off()
+```
+
+
+```{r}
+p <- clustree(mmes1, prefix = "RNA_snn_res.")
+p
+```

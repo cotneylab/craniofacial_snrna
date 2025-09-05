@@ -1,0 +1,687 @@
+---
+title: "Progenitors_subclustering_and_annotation"
+output: html_document
+date: "2025-04-14"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "/scr1/users/manchela/Data") 
+library(Seurat)
+library(SeuratDisk)
+library(tidyverse)
+library(harmony)
+library(dplyr)
+library(patchwork)
+library(viridis)
+library(ggforce)
+library(gghalves)
+library(ggridges)
+library(scCustomize)
+library(SCpubr)
+library(dplyr)
+library(DropletUtils)
+library(biomaRt)
+library(limma)
+library(pheatmap)
+library(grid)
+library(openxlsx)
+library(clusterProfiler)
+library(enrichplot)
+library(org.Hs.eg.db)
+library(AnnotationHub)
+library(ReactomePA)
+library(DOSE)
+library(orthogene)
+library(factoextra)
+library(smerc)
+library(Rfast)
+library(GeneOverlap)
+library(reshape2)
+library(scales)
+```
+
+Progenitor Subclustering
+
+```{r}
+prog <- initial.filt_singlet_noneuro[,which(initial.filt_singlet_noneuro$celltype=="progenitors")]
+
+prog <- NormalizeData(prog)
+prog <- CellCycleScoring(prog, s.features = cc.genes$s.genes, g2m.features = cc.genes$g2m.genes, set.ident = TRUE)
+
+prog <- FindVariableFeatures(prog) %>% 
+  ScaleData(vars.to.regress = c("S.Score", "G2M.Score")) %>% 
+  RunPCA(verbose = FALSE) %>% 
+  RunHarmony(group.by.vars = "orig.ident")
+
+prog <- RunUMAP(prog, reduction = "harmony", dims = 1:30, min.dist = 0.3) %>%
+  FindNeighbors(reduction = "harmony", dims = 1:30, verbose = FALSE) %>%
+  FindClusters(resolution = c(0.2,0.4,0.6,0.8,1,2,3,4), verbose = FALSE)
+
+```
+
+```{r}
+prog <- readRDS("human_face_prog_cellrangerARC-raw_emptyDrops_singlets_27Mar.rds")
+```
+
+
+Identify optimal number of clusters
+
+```{r}
+# downsample because # of cells is too high for dist calculation
+set.seed(123)
+subset_idx<- sample(1:ncol(prog),round(ncol(prog)*0.25))
+prog_downsample <- prog[,subset_idx]
+
+x=prog_downsample@assays$RNA$scale.data
+diss <- Rfast::Dist(as.matrix(x))
+
+k.max=100
+v <- rep(0, k.max)
+for (i in 1:k.max) {
+  clust <- kmeans(x, i)
+  v[i] <- factoextra:::.get_withinSS(diss, clust$cluster)
+  cat(i)
+}
+
+
+df <- data.frame(clusters = as.factor(1:k.max), y = v, 
+                 stringsAsFactors = TRUE)
+
+```
+
+```{r}
+ylab <- "Total Within Sum of Square"
+p <- ggpubr::ggline(df, x = "clusters", y = "y", group = 1, 
+                    color = "steelblue", ylab = ylab, xlab = "Number of clusters k", 
+                    main = "Sox2+ Sox10- Cells: Optimal number of clusters")
+
+p <- readRDS("human_face_prog_ElbowPlot_data_27Mar.rds")
+p + scale_x_discrete(breaks = seq(0, max(as.numeric(as.character(p$data$clusters))), by = 5))+
+  geom_vline(xintercept = elbow_point(as.numeric(p$data$clusters),as.numeric(p$data$y))$x, linetype=2)
+
+elbow_point(as.numeric(p$data$clusters),as.numeric(p$data$y))
+# x= 20 clusters
+
+apply(prog@meta.data[,grep("RNA_snn_res",colnames(prog@meta.data))],2,function(x) length(unique(x)))
+# choosing resolution=1 (20 clusters)
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Progenitors_Subclustering_OptimalClusters_ElbowPlot.pdf",width=11,height=8.5)
+p + scale_x_discrete(breaks = seq(0, max(as.numeric(as.character(p$data$clusters))), by = 5))+
+  geom_vline(xintercept = elbow_point(as.numeric(p$data$clusters),as.numeric(p$data$y))$x, linetype=2)
+dev.off()
+```
+
+
+```{r}
+stage_colors <- viridis_plasma_dark_high[match(1:6,cut(1:length(viridis_plasma_dark_high), breaks = 6,labels=1:6))]
+names(stage_colors) <- levels(prog$stage)
+
+p1 <- DimPlot_scCustom(prog, group.by="orig.ident",colors_use = hue_pal()(length(unique(prog$orig.ident))),label=F)
+p2 <- DimPlot_scCustom(prog, group.by="stage",colors_use = stage_colors,label=F)
+p3 <- DimPlot_scCustom(prog, group.by="RNA_snn_res.1",colors_use = hue_pal()(length(unique(prog$RNA_snn_res.1))),
+                       label=T,label.box=T,repel=T) +
+  scale_fill_manual(values = rep("white",length(unique(prog$RNA_snn_res.1)))) + NoLegend()
+
+p1
+p2
+p3
+```
+
+```{r}
+
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Progenitors_subclustering_Dimplots.pdf",width=11,height=8.5)
+p1
+p2
+p3
+dev.off()
+```
+
+
+Find marker genes
+```{r}
+mart <-  useMart("ENSEMBL_MART_ENSEMBL") #, host = "https://useast.ensembl.org")
+mart <- useDataset("hsapiens_gene_ensembl", mart)
+prog_annotLookup <- getBM(
+  mart = mart,
+  attributes = c(
+    "hgnc_symbol","description",
+    "entrezgene_id",
+    "gene_biotype"),
+  filter = "hgnc_symbol",
+  values = rownames(prog),
+  uniqueRows=TRUE)
+  
+
+
+Idents(prog) <- prog$RNA_snn_res.1
+prog_marker_genes <- FindAllMarkers(prog, assay = "RNA" ,logfc.threshold = 0.25, test.use = "wilcox", min.pct = 0.1, 
+                                   min.diff.pct = -Inf, node = NULL, verbose = TRUE,
+                                   only.pos = TRUE, max.cells.per.ident = Inf, random.seed = 1,
+                                   latent.vars = NULL, min.cells.feature = 3, min.cells.group = 3,
+                                   pseudocount.use = 1, return.thresh = 0.01)
+
+prog_marker_genes <- mutate(prog_marker_genes,pct.diff=pct.1-pct.2)
+id <- intersect(prog_annotLookup$hgnc_symbol,prog_marker_genes$gene)
+x <- prog_marker_genes[prog_marker_genes$gene %in% id,]
+prog_marker_genes$Entrez <- prog_annotLookup$entrezgene_id[match(as.character(prog_marker_genes$gene),prog_annotLookup$hgnc_symbol)]
+prog_marker_genes$description <- prog_annotLookup$description[match(as.character(prog_marker_genes$gene),prog_annotLookup$hgnc_symbol)]
+prog_marker_genes$biotype <- prog_annotLookup$gene_biotype[match(as.character(prog_marker_genes$gene),prog_annotLookup$hgnc_symbol)]
+
+prog_marker_genes <- prog_marker_genes[, c("gene","Entrez","description","biotype","p_val_adj","avg_log2FC","pct.1","pct.2","pct.diff","cluster")]
+head(prog_marker_genes)
+openxlsx::write.xlsx(prog_marker_genes,"Craniofacial-scRNAseqManuscript/final-tables/SigGenes_prog_Res1Clusters.xlsx")
+```
+
+
+top marker genes
+```{r}
+prog_marker_genes <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/SigGenes_prog_Res1Clusters.xlsx")
+prog_marker_genes_protein <- subset(prog_marker_genes, biotype == "protein_coding")
+
+top_prog <- prog_marker_genes_protein %>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% top_n(10, avg_log2FC)
+top100_prog <- prog_marker_genes_protein %>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% top_n(100, avg_log2FC)
+top100pval_prog <- subset(top100_prog, rowSums(top100_prog[5] < 0.05) > 0)
+
+top50_prog <- prog_marker_genes_protein %>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% top_n(50, avg_log2FC)
+top50pval_prog <- subset(top50_prog, rowSums(top50_prog[5] < 0.05) > 0)
+```
+
+DotPlot of top marker genes
+```{r}
+
+prog_marker_genes_protein <- prog_marker_genes_protein[order(prog_marker_genes_protein$cluster),]
+prog_marker_genes_protein <- prog_marker_genes_protein[order(as.numeric(prog_marker_genes_protein$cluster)),]
+
+top_initial_prog <- prog_marker_genes_protein %>% group_by(cluster) %>% top_n(10, avg_log2FC)
+
+Idents(prog) <- prog$RNA_snn_res.1
+  p <- DotPlot(object = prog, features = unique(top_initial_prog$gene))+ coord_flip()+ RotatedAxis()
+df <- data.frame(Gene = p$data$features.plot, avg.exp = p$data$avg.exp.scaled, pct.exp = p$data$pct.exp, cluster = p$data$id)
+
+out <- DotPlot_scCustom(seurat_object = prog, features = unique(top_initial_prog$gene), colors_use = viridis_plasma_dark_high,flip_axes=T,
+                         remove_axis_titles = T,x_lab_rotate = T) + theme(axis.text.x = element_text(size = 10),axis.text.y = element_text(size = 6, face = "italic"))
+out
+
+
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Progenitors_Res1Clusters_markergenes_dotplot.pdf",width=8.5,height=18)
+out
+dev.off()
+
+```
+
+Functional annotation
+
+```{r}
+df1 <- top100pval_prog[,c(2,10)]
+df1$cluster <- factor(df1$cluster,levels=unique(df1$cluster))
+df1$cluster <- factor(df1$cluster,levels=levels(df1$cluster))
+df1sample <- split(df1$Entrez,df1$cluster)
+length(df1sample)
+initial_types <- names(df1sample)
+
+genelist <- as.list(df1sample)
+background_genes <- unique(prog_marker_genes_protein$Entrez)
+
+BPclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'BP', universe = background_genes)
+BPclusterplot <- pairwise_termsim(BPclusterplot)
+
+CCclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'CC', universe = background_genes)
+CCclusterplot <- pairwise_termsim(CCclusterplot)
+
+MFclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'MF', universe = background_genes)
+MFclusterplot <- pairwise_termsim(MFclusterplot)
+
+Pathwayclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichPathway", pvalueCutoff=0.05, pAdjustMethod = "BH", universe = background_genes)
+Pathwayclusterplot <- pairwise_termsim(Pathwayclusterplot)
+
+KEGGclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichKEGG", pvalueCutoff=0.05, pAdjustMethod = "BH", universe = background_genes)
+KEGGclusterplot <- pairwise_termsim(KEGGclusterplot)
+
+DOclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichDGN", pvalueCutoff=0.05, pAdjustMethod = "BH", universe = background_genes)
+DOclusterplot <- pairwise_termsim(DOclusterplot)
+
+
+options(enrichplot.colours = c("blue", "grey"))
+p1 <- dotplot(BPclusterplot, showCategory = 5, font.size = 6, title = "GO: Biological Process", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("orange", "grey"))
+p2 <- dotplot(CCclusterplot, showCategory = 5, font.size = 6, title = "GO: Cellular Component", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("green", "grey"))
+p3 <- dotplot(MFclusterplot, showCategory = 5, font.size = 6, title = "GO: Molecular Function", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("brown", "grey"))
+p4 <- dotplot(Pathwayclusterplot, showCategory = 10, font.size = 6, title = "Reactome Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("yellow", "grey"))
+p5 <- dotplot(KEGGclusterplot, showCategory = 10, font.size = 6, title = "KEGG Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("red", "grey"))
+p6 <- dotplot(DOclusterplot, showCategory = 10, font.size = 6, title = "DisGeNet", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+
+p1
+p2
+p3
+p4
+p5
+p6
+
+
+```
+
+```{r}
+prog_annot_list <- list(BP =BPclusterplot, CC=CCclusterplot, MF = MFclusterplot, Reactome=Pathwayclusterplot,
+                          KEGG=KEGGclusterplot, DisGeNet=DOclusterplot)
+saveRDS(prog_annot_list, "human_face_prog_Res1Clusters_functional-annotation_lists_27Mar.rds")
+
+prog_annot_list <- readRDS("human_face_prog_Res1Clusters_functional-annotation_lists_27Mar.rds")
+prog_annot_list$BP <- prog_annot_list$BP@compareClusterResult
+prog_annot_list$CC <- prog_annot_list$CC@compareClusterResult
+prog_annot_list$MF <- prog_annot_list$MF@compareClusterResult
+prog_annot_list$Reactome <- prog_annot_list$Reactome@compareClusterResult
+prog_annot_list$KEGG <- prog_annot_list$KEGG@compareClusterResult
+prog_annot_list$DisGeNet <- prog_annot_list$DisGeNet@compareClusterResult
+openxlsx::write.xlsx(prog_annot_list, file = "Craniofacial-scRNAseqManuscript/final-tables/human_face_prog_Res1Clusters_functional-annotation.xlsx",
+                     sheetName = names(prog_annot_list), rowNames = FALSE)
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Progenitors_Res1Clusters_Top10_FunctionalEnrichment_dotplot.pdf",width=8.5,height=16)
+p1
+p2
+p3
+p4
+p5
+p6
+dev.off()
+```
+
+Neural Progenitor Markers from ScType database (ScTypeDB_full.xlsx from https://github.com/IanevskiAleksandr/sc-type)
+```{r}
+prog <- AddModuleScore(prog,list(c("CSPG4","RNF5","EOMES","SOX2","SOX1","NES","PAX3","PAX6","OTX2","CNTNAP1","ASCL1","SMARCA4","MSI1","MSI2")),name="NeuralProg_ModuleScore")
+VlnPlot_scCustom(prog,features="NeuralProg_ModuleScore1",plot_median=T,group.by="RNA_snn_res.1",pt.size=0) + NoLegend()+ geom_hline(yintercept = median(prog$NeuralProg_ModuleScore1),linetype=2)
+
+prog$subtype1 <- as.character(prog$RNA_snn_res.1)
+prog$subtype1[which(prog$subtype1=="3")] <- "NeuralProg_1"
+prog$subtype1[which(prog$subtype1=="7")] <- "NeuralProg_2"
+prog$subtype1[which(prog$subtype1=="11")] <- "NeuralProg_3"
+prog$subtype1[which(prog$subtype1=="15")] <- "NeuralProg_4"
+prog$subtype1[which(prog$subtype1=="18")] <- "NeuralProg_5"
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Progenitors_NeuralProgenitor_ModScore_VlnPlot.pdf",width=11,height=8.5)
+VlnPlot_scCustom(prog,features="NeuralProg_ModuleScore1",plot_median=T,group.by="RNA_snn_res.1",pt.size=0) + NoLegend()+ geom_hline(yintercept = median(prog$NeuralProg_ModuleScore1),linetype=2)
+dev.off()
+```
+
+Neural Stem Cell Markers from Wang et al. 2024 (doi:10.1186/s13578-024-01302-9)
+```{r}
+prog <- AddModuleScore(prog,list(c("CBLB","GRAMD1B","TENM3","TANC2","MACF1")),
+                       name="NeuralStem_ModuleScore")
+VlnPlot_scCustom(prog,features="NeuralStem_ModuleScore1",plot_median=T,group.by="RNA_snn_res.1",pt.size=0) + NoLegend()+ 
+  geom_hline(yintercept = median(prog$NeuralStem_ModuleScore1),linetype=2)
+
+prog$subtype1[which(prog$subtype1=="0")] <- "NeuralStem_1"
+prog$subtype1[which(prog$subtype1=="9")] <- "NeuralStem_2"
+prog$subtype1[which(prog$subtype1=="9")] <- "NeuralStem_3"
+prog$subtype1[which(prog$subtype1=="10")] <- "NeuralStem_4"
+prog$subtype1[which(prog$subtype1=="13")] <- "NeuralStem_5"
+prog$subtype1[which(prog$subtype1=="17")] <- "NeuralStem_6"
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Progenitors_NeuralStem_ModScore_VlnPlot.pdf",width=11,height=8.5)
+VlnPlot_scCustom(prog,features="NeuralStem_ModuleScore1",plot_median=T,group.by="RNA_snn_res.1",pt.size=0) + NoLegend()+ geom_hline(yintercept = median(prog$NeuralStem_ModuleScore1),linetype=2)
+dev.off()
+```
+
+Mesenchymal Progenitor Markers from Wang et al. 2024 (doi:10.1186/s13578-024-01302-9)
+```{r}
+prog <- AddModuleScore(prog,list(c("DKK1","APOD","TIMP1","PCOLCE","SPARC")),name="MesProg_ModuleScore")
+VlnPlot_scCustom(prog,features="MesProg_ModuleScore1",plot_median=T,group.by="RNA_snn_res.1",pt.size=0) + NoLegend()+ geom_hline(yintercept = median(prog$MesProg_ModuleScore1),linetype=2)
+
+prog$subtype1[which(prog$subtype1=="2")] <- "MesenchymalProg_1"
+prog$subtype1[which(prog$subtype1=="14")] <- "MesenchymalProg_2"
+prog$subtype1[which(prog$subtype1=="16")] <- "MesenchymalProg_3"
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Progenitors_MesenchymalProgenitor_ModScore_VlnPlot.pdf",width=11,height=8.5)
+VlnPlot_scCustom(prog,features="MesProg_ModuleScore1",plot_median=T,group.by="RNA_snn_res.1",pt.size=0) + NoLegend()+ geom_hline(yintercept = median(prog$MesProg_ModuleScore1),linetype=2)
+dev.off()
+```
+
+VlnPlots of select genes
+```{r}
+VlnPlot_scCustom(prog,"TWIST1",pt.size=0,group.by="RNA_snn_res.1",plot_median = T) + NoLegend()+ geom_hline(yintercept = median(as.matrix(prog@assays$RNA@layers$data)[which(rownames(prog)=="TWIST1"),]),linetype=2)
+
+VlnPlot_scCustom(prog,"ALX1",pt.size=0,group.by="RNA_snn_res.1",plot_median = T) + NoLegend()+ geom_hline(yintercept = median(as.matrix(prog@assays$RNA@layers$data)[which(rownames(prog)=="ALX1"),]),linetype=2)
+
+VlnPlot_scCustom(prog,"PDGFRA",pt.size=0,group.by="RNA_snn_res.1",plot_median = T) + NoLegend()+ geom_hline(yintercept = median(as.matrix(prog@assays$RNA@layers$data)[which(rownames(prog)=="PDGFRA"),]),linetype=2)
+
+VlnPlot_scCustom(prog,"PRRX1",pt.size=0,group.by="RNA_snn_res.1",plot_median = T) + NoLegend()+ geom_hline(yintercept = median(as.matrix(prog@assays$RNA@layers$data)[which(rownames(prog)=="PRRX1"),]),linetype=2)
+
+#TWIST1 is a marker for clusters 1,2,4,8,13,16,19
+#ALX1 is a marker for clusters 4,8,9,13,16,19
+#PDGFRA is a marker for clusters 2,8,9,10,13,14,16
+#PRRX1 is a marker for clusters 1,4,8,9,10,13,14,16
+prog$subtype1[which(prog$subtype1=="4")] <- "MesenchymalLikeProg_1"
+prog$subtype1[which(prog$subtype1=="8")] <- "MesenchymalLikeProg_2"
+```
+
+```{r}
+DimPlot(prog,group.by="subtype1",label=T)
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Progenitors_Mesenchyme_GeneMarkers_VlnPlot.pdf",width=11,height=8.5)
+
+VlnPlot_scCustom(prog,"TWIST1",pt.size=0,group.by="RNA_snn_res.1",plot_median = T) + NoLegend()+ geom_hline(yintercept = median(as.matrix(prog@assays$RNA@layers$data)[which(rownames(prog)=="TWIST1"),]),linetype=2)
+
+VlnPlot_scCustom(prog,"ALX1",pt.size=0,group.by="RNA_snn_res.1",plot_median = T) + NoLegend()+ geom_hline(yintercept = median(as.matrix(prog@assays$RNA@layers$data)[which(rownames(prog)=="ALX1"),]),linetype=2)
+
+VlnPlot_scCustom(prog,"PDGFRA",pt.size=0,group.by="RNA_snn_res.1",plot_median = T) + NoLegend()+ geom_hline(yintercept = median(as.matrix(prog@assays$RNA@layers$data)[which(rownames(prog)=="PDGFRA"),]),linetype=2)
+
+VlnPlot_scCustom(prog,"PRRX1",pt.size=0,group.by="RNA_snn_res.1",plot_median = T) + NoLegend()+ geom_hline(yintercept = median(as.matrix(prog@assays$RNA@layers$data)[which(rownames(prog)=="PRRX1"),]),linetype=2)
+
+dev.off()
+```
+
+Epithelial progenitor markers from human CellMarker2.0 Database (http://www.bio-bigdata.center)
+```{r}
+prog <- AddModuleScore(prog,list(c("IGFBP5","PODXL","KRT19","ABCG2","CDH1","KRT18","TP63")),name="EpithelialProg_ModuleScore")
+VlnPlot_scCustom(prog,features="EpithelialProg_ModuleScore1",plot_median=T,group.by="RNA_snn_res.1",pt.size=0) + NoLegend()+ geom_hline(yintercept = median(prog$EpithelialProg_ModuleScore1),linetype=2)
+
+# VlnPlot_scCustom(prog,"EPCAM",pt.size=0,group.by="subtype1",plot_median = T) + NoLegend()+ geom_hline(yintercept = median(as.matrix(prog@assays$RNA@layers$data)[which(rownames(prog)=="EPCAM"),]),linetype=2)
+
+prog$subtype1[which(prog$subtype1=="6")]<- "Epithelial_Progenitor"
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Progenitors_EpithelialProgenitor_ModScore_VlnPlot.pdf",width=11,height=8.5)
+VlnPlot_scCustom(prog,features="EpithelialProg_ModuleScore1",plot_median=T,group.by="RNA_snn_res.1",pt.size=0) + NoLegend()+ geom_hline(yintercept = median(prog$EpithelialProg_ModuleScore1),linetype=2)
+dev.off()
+```
+
+
+General progenitor cell clusters
+```{r}
+prog$subtype1[which(prog$subtype1=="1")] <- "Prog_1"
+prog$subtype1[which(prog$subtype1=="5")] <- "Prog_2"
+prog$subtype1[which(prog$subtype1=="12")] <- "Prog_3"
+prog$subtype1[which(prog$subtype1=="19")] <- "Prog_4"
+```
+
+plotting SOX2 expression
+```{r}
+p <- FeaturePlot(prog,c("SOX2"),label=T)
+p           
+
+p2 <- VlnPlot_scCustom(prog,"SOX2",plot_median=T,pt.size=0) + NoLegend()
+p2
+
+
+```
+
+```{r}
+
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Progenitors_SOX2_Plots.pdf",width=11,height=8.5)
+p
+p2
+dev.off()
+```
+
+```{r}
+p <- VlnPlot_scCustom(prog,c("NeuralProg_ModuleScore1","NeuralStem_ModuleScore1","MesProg_ModuleScore1","EpithelialProg_ModuleScore1"),plot_median = T,pt.size=0,num_columns = 1)
+p
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Prog_ModScores_StackedVlnPlot.pdf",height=11,width=8.5)
+p
+dev.off()
+```
+
+
+```{r}
+prog$subtype_final <- prog$subtype1
+
+prog$subtype_final_reduced <- strsplit2(as.character(prog$subtype_final),split="_[0-9]$")[,1]
+
+prog$subtype_final <- factor(prog$subtype_final)
+prog$subtype_final_reduced <- factor(prog$subtype_final_reduced)
+```
+
+
+```{r}
+prog_colors <- DiscretePalette_scCustomize(num_colors = length(unique(as.character(prog$subtype_final))),
+                                          palette = "polychrome")
+names(prog_colors) <- levels(prog$subtype_final)
+
+prog$color <- as.character(prog_colors)[match(prog$subtype_final,names(prog_colors))]
+prog_plot_colors <- prog$color 
+names(prog_plot_colors) <- prog$subtype_final
+  
+p <- DimPlot_scCustom(prog, group.by="subtype_final",colors_use = prog_plot_colors,
+                       label=T,label.box=T,repel=T) +
+  scale_fill_manual(values = rep("white",length(unique(prog$subtype_final)))) + NoLegend()
+p
+
+p2 <- DimPlot_scCustom(prog, group.by="subtype_final_reduced",colors_use = hue_pal()(length(unique(prog$subtype_final_reduced))),
+                       label=T,label.box=T,repel=T) +
+  scale_fill_manual(values = rep("white",length(unique(prog$subtype_final_reduced)))) + NoLegend()
+p2
+
+
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Progenitors_subtype_final_annotations_DimPlots.pdf",width=11,height=8.5)
+p
+p2
+dev.off()
+```
+
+BarPlots by stage and subtype
+```{r}
+prog$subtype_final <- factor(prog$subtype_final, levels=names(sort(table(prog$subtype_final),decreasing = T)))
+
+
+p1 <- SCpubr::do_BarPlot(prog, 
+                   group.by = "stage",
+                   split.by = "subtype_final",
+                   position = "fill",
+                   flip = FALSE, 
+                   legend.position = "right",
+                   colors.use = stage_colors)
+p1
+
+p2 <- SCpubr::do_BarPlot(prog, 
+                   group.by = "stage",
+                   split.by = "subtype_final",
+                   position = "stack",
+                   flip = FALSE,
+                   legend.position = "right",
+                   colors.use = stage_colors)
+p2
+
+
+p3 <- SCpubr::do_BarPlot(prog, 
+                   group.by = "subtype_final",
+                   split.by = "stage",
+                   position = "fill",
+                   flip = FALSE, 
+                   legend.position = "right",
+                   colors.use = prog_colors)
+p3
+
+p4 <- SCpubr::do_BarPlot(prog, 
+                   group.by = "subtype_final",
+                   split.by = "stage",
+                   position = "stack",
+                   flip = FALSE, 
+                   legend.position = "right",
+                   colors.use = prog_colors)
+p4
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Prog_subtype_final_stage_barplot.pdf",width=11,height=8.5)
+p1
+p2
+p3
+p4
+dev.off()
+```
+
+
+top marker genes
+```{r}
+sig_genes_prog <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/SigGenes_prog_Res1Clusters.xlsx")
+sig_genes_prog$cluster <- prog$subtype_final[match(sig_genes_prog$cluster,as.character(prog$RNA_snn_res.1))]
+
+prog$subtype_final <- factor(prog$subtype_final,levels=unique(sig_genes_prog$cluster))
+  
+sig_genes_prog_protein <- subset(sig_genes_prog, biotype == "protein_coding")
+
+top <- sig_genes_prog_protein %>% 
+  mutate(cluster = factor(cluster, levels = levels(prog$subtype_final))) %>% 
+  group_by(cluster) %>% top_n(5, avg_log2FC) %>% arrange(cluster)
+
+top100_celltype <- sig_genes_prog_protein %>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% top_n(100, avg_log2FC)
+top100pval_celltype <- subset(top100_celltype, rowSums(top100_celltype[5] < 0.05) > 0)
+
+top50_celltype <- sig_genes_prog_protein%>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% top_n(50, avg_log2FC)
+top50pval_celltype <- subset(top50_celltype, rowSums(top50_celltype[5] < 0.05) > 0)
+```
+
+DotPlot of top marker genes
+```{r}
+Idents(prog) <- prog$subtype_final
+
+top <- sig_genes_prog_protein %>% group_by(cluster) %>% top_n(5, avg_log2FC)
+
+p <- DotPlot(object = prog, features = unique(top$gene))+ coord_flip()+ RotatedAxis()
+df <- data.frame(Gene = p$data$features.plot, avg.exp = p$data$avg.exp.scaled, pct.exp = p$data$pct.exp, cluster = p$data$id)
+
+out <- DotPlot_scCustom(seurat_object = prog, features = unique(top$gene), colors_use = viridis_plasma_dark_high,flip_axes=T,
+                         remove_axis_titles = T,x_lab_rotate = T) + theme(axis.text.x = element_text(size = 8),axis.text.y = element_text(size = 8, face = "italic"), legend.position = "bottom",legend.justification = "center", legend.title = element_text(size = 10, hjust=0.5),legend.text = element_text(size = 10))+guides(color = guide_colorbar(title.position = "top",title = "Average Expression"),size = guide_legend(title.position = "top",title = "Percent Expressed")) 
+out
+
+
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Progenitors_subtype_final_markergenes_dotplot.pdf",width=8.5, height=15)
+out
+dev.off()
+
+```
+
+Cell cycle markers
+```{r}
+prog$S.Score.adjust <- prog$S.Score + abs(min(prog$S.Score))
+prog$G2M.Score.adjust <- prog$G2M.Score + abs(min(prog$G2M.Score))
+
+prog$cellcycle.ratio <- prog$S.Score.adjust / prog$G2M.Score.adjust
+VlnPlot_scCustom(seurat_object = prog, features = "cellcycle.ratio", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final", colors_use = prog_plot_colors) +
+  ylim(c(0,5)) + NoLegend() + geom_hline(yintercept=median(prog$cellcycle.ratio),linetype=2)
+
+VlnPlot_scCustom(seurat_object = prog, features = "S.Score", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final", colors_use = prog_plot_colors) + NoLegend()  + geom_hline(yintercept=median(prog$S.Score),linetype=2)
+
+VlnPlot_scCustom(seurat_object = prog, features = "G2M.Score", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final", colors_use = prog_plot_colors) + NoLegend()  + geom_hline(yintercept=median(prog$G2M.Score),linetype=2)
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Progenitors_subtype_final_CellCycle_VlnPlot.pdf",width=11,height=8.5)
+VlnPlot_scCustom(seurat_object = prog, features = "cellcycle.ratio", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final", colors_use = prog_plot_colors) +
+  ylim(c(0,5)) + NoLegend() + geom_hline(yintercept=median(prog$cellcycle.ratio),linetype=2)
+
+VlnPlot_scCustom(seurat_object = prog, features = "S.Score", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final", colors_use = prog_plot_colors) + NoLegend()  + geom_hline(yintercept=median(prog$S.Score),linetype=2)
+
+VlnPlot_scCustom(seurat_object = prog, features = "G2M.Score", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final", colors_use = prog_plot_colors) + NoLegend()  + geom_hline(yintercept=median(prog$G2M.Score),linetype=2)
+dev.off()
+```
+
+
+Functional annotation for human progenitor subtypes
+```{r}
+prog_annot_list <- readRDS("human_face_prog_Res1Clusters_functional-annotation_lists_27Mar.rds")
+for (i in names(prog_annot_list)){
+  prog_annot_list[[i]]@compareClusterResult$Cluster <- as.character(prog_annot_list[[i]]@compareClusterResult$Cluster)
+  prog_annot_list[[i]]@compareClusterResult$Cluster <- 
+    as.character(prog$subtype_final[match(prog_annot_list[[i]]@compareClusterResult$Cluster,as.character(prog$RNA_snn_res.1))])
+  prog_annot_list[[i]]@compareClusterResult <- prog_annot_list[[i]]@compareClusterResult %>% arrange(Cluster)
+  prog_annot_list[[i]]@compareClusterResult$Cluster <- factor(prog_annot_list[[i]]@compareClusterResult$Cluster, levels = unique(prog_annot_list[[i]]@compareClusterResult$Cluster))
+}
+
+BPclusterplot <- prog_annot_list$BP
+options(enrichplot.colours = c("blue", "grey"))
+p1 <- dotplot(BPclusterplot, showCategory = 5, font.size = 6, title = "GO: Biological Process", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1) )
+
+CCclusterplot <- prog_annot_list$CC
+options(enrichplot.colours = c("orange", "grey"))
+p2 <- dotplot(CCclusterplot, showCategory = 5, font.size = 6, title = "GO: Cellular Component", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1))
+
+MFclusterplot <- prog_annot_list$MF
+options(enrichplot.colours = c("green", "grey"))
+p3 <- dotplot(MFclusterplot, showCategory = 5, font.size = 6, title = "GO: Molecular Function", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1))
+
+Pathwayclusterplot <- prog_annot_list$Reactome
+options(enrichplot.colours = c("brown", "grey"))
+p4 <- dotplot(Pathwayclusterplot, showCategory = 5, font.size = 6, title = "Reactome Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1))
+
+KEGGclusterplot <- prog_annot_list$KEGG
+options(enrichplot.colours = c("yellow", "grey"))
+p5 <- dotplot(KEGGclusterplot, showCategory = 5, font.size = 6, title = "KEGG Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1))
+
+DOclusterplot <- prog_annot_list$DisGeNet
+options(enrichplot.colours = c("red", "grey"))
+p6 <- dotplot(DOclusterplot, showCategory = 5, font.size = 6, title = "DisGeNet", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1))
+
+p1
+p2
+p3
+p4
+p5
+p6
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Progenitors_subtype_final_Top5_FunctionalEnrichment_dotplot.pdf",width=8.5,height=16)
+p1
+p2
+p3
+p4
+p5
+p6
+dev.off()
+```
+
+
+```{r}
+pdf(file = "Craniofacial-scRNAseqManuscript/final-figs/Progenitors_subtype_final_Top5_FunctionalEnrichment_dotplot_plotgrid.pdf", w = 17, h = 22)
+cowplot::plot_grid(p1, p2, p3, p4, p5, p6, ncol=2, labels=LETTERS[1:6])
+dev.off()
+```
+
+
+

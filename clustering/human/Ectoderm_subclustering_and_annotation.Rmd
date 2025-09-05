@@ -1,0 +1,1432 @@
+---
+title: "Ectoderm subclustering and annotation"
+output: html_document
+date: "2025-04-05"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "/scr1/users/manchela/Data") 
+library(Seurat)
+library(SeuratDisk)
+library(tidyverse)
+library(harmony)
+library(dplyr)
+library(patchwork)
+library(viridis)
+library(ggforce)
+library(gghalves)
+library(ggridges)
+library(scCustomize)
+library(SCpubr)
+library(dplyr)
+library(DropletUtils)
+library(biomaRt)
+library(limma)
+library(pheatmap)
+library(grid)
+library(openxlsx)
+library(clusterProfiler)
+library(enrichplot)
+library(org.Hs.eg.db)
+library(AnnotationHub)
+library(ReactomePA)
+library(DOSE)
+library(orthogene)
+library(factoextra)
+library(smerc)
+library(Rfast)
+library(GeneOverlap)
+library(reshape2)
+library(ggvenn)
+library(scales)
+library(ggalluvial)
+```
+
+Ectoderm Subclustering
+
+```{r}
+ect <- initial.filt_singlet_noneuro[,which(initial.filt_singlet_noneuro$celltype=="Ectoderm")]
+
+ect <- NormalizeData(ect)
+ect <- CellCycleScoring(ect, s.features = cc.genes$s.genes, g2m.features = cc.genes$g2m.genes, set.ident = TRUE)
+
+ect <- FindVariableFeatures(ect) %>% 
+  ScaleData(vars.to.regress = c("S.Score", "G2M.Score")) %>% 
+  RunPCA(verbose = FALSE) %>% 
+  RunHarmony(group.by.vars = "orig.ident")
+
+ect <- RunUMAP(ect, reduction = "harmony", dims = 1:30, min.dist = 0.3) %>%
+  FindNeighbors(reduction = "harmony", dims = 1:30, verbose = FALSE) %>%
+  FindClusters(resolution = c(0.2,0.4,0.6,0.8,1,2,3,4), verbose = FALSE)
+
+```
+
+```{r}
+ect <- readRDS("human_face_ect_cellrangerARC-raw_emptyDrops_singlets_27Mar.rds")
+
+dim(ect)
+```
+
+
+Identify optimal number of clusters
+
+```{r}
+set.seed(123)
+x=ect@assays$RNA$scale.data
+diss <- Rfast::Dist(as.matrix(t(x)))
+
+k.max=100
+v <- rep(0, k.max)
+for (i in 1:k.max) {
+  clust <- kmeans(x, i)
+  v[i] <- factoextra:::.get_withinSS(diss, clust$cluster)
+  cat(i)
+}
+
+
+df <- data.frame(clusters = as.factor(1:k.max), y = v, 
+                 stringsAsFactors = TRUE)
+
+```
+
+```{r}
+ylab <- "Total Within Sum of Square"
+p <- ggpubr::ggline(df, x = "clusters", y = "y", group = 1, 
+                    color = "steelblue", ylab = ylab, xlab = "Number of clusters k", 
+                    main = "Ectoderm: Optimal number of clusters")
+
+p <- readRDS("human_face_ect_ElbowPlot_data_27Mar.rds")
+p + scale_x_discrete(breaks = seq(0, max(as.numeric(as.character(p$data$clusters))), by = 5))+
+  geom_vline(xintercept = elbow_point(as.numeric(p$data$clusters),as.numeric(p$data$y))$x, linetype=2)
+
+elbow_point(as.numeric(p$data$clusters),as.numeric(p$data$y))
+# x= 25 clusters
+
+apply(ect@meta.data[,grep("RNA_snn_res",colnames(ect@meta.data))],2,function(x) length(unique(x)))
+# choosing resolution=0.8 (23 clusters)
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Ectoderm_Subclustering_OptimalClusters_ElbowPlot.pdf",width=11,height=8.5)
+p + scale_x_discrete(breaks = seq(0, max(as.numeric(as.character(p$data$clusters))), by = 5))+
+  geom_vline(xintercept = elbow_point(as.numeric(p$data$clusters),as.numeric(p$data$y))$x, linetype=2)
+dev.off()
+```
+
+unique subtype colors and DimPlots of relevant annotations
+```{r}
+stage_colors <- viridis_plasma_dark_high[match(1:6,cut(1:length(viridis_plasma_dark_high), breaks = 6,labels=1:6))]
+names(stage_colors) <- levels(ect$stage)
+
+p1 <- DimPlot_scCustom(ect, group.by="orig.ident",colors_use = hue_pal()(length(unique(ect$orig.ident))),label=F)
+
+p2 <- DimPlot_scCustom(ect, group.by="stage",colors_use = stage_colors,label=F)
+
+p3 <- DimPlot_scCustom(ect, group.by="RNA_snn_res.0.8",colors_use = hue_pal()(length(unique(ect$RNA_snn_res.0.8))),
+                       label=T,label.box=T,repel=T) +
+  scale_fill_manual(values = rep("white",length(unique(ect$RNA_snn_res.0.8)))) + NoLegend()
+
+p1
+p2
+p3
+```
+
+```{r}
+
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Ectoderm_subclustering_Dimplots.pdf",width=11,height=8.5)
+p1
+p2
+p3
+dev.off()
+```
+
+```{r}
+as.data.frame(table(ect$RNA_snn_res.0.8,ect$subtype1)) %>% filter(Freq!=0)
+```
+
+
+Find marker genes
+```{r}
+mart <-  useMart("ENSEMBL_MART_ENSEMBL") #, host = "https://useast.ensembl.org")
+mart <- useDataset("hsapiens_gene_ensembl", mart)
+ect_annotLookup <- getBM(
+  mart = mart,
+  attributes = c(
+    "hgnc_symbol","description",
+    "entrezgene_id","ensembl_gene_id",
+    "gene_biotype"),
+  filter = "hgnc_symbol",
+  values = rownames(ect),
+  uniqueRows=TRUE)
+  
+
+Idents(ect) <- ect$RNA_snn_res.0.8
+ect_marker_genes <- FindAllMarkers(ect, assay = "RNA" ,logfc.threshold = 0.25, test.use = "wilcox", min.pct = 0.1, 
+                                   min.diff.pct = -Inf, node = NULL, verbose = TRUE,
+                                   only.pos = TRUE, max.cells.per.ident = Inf, random.seed = 1,
+                                   latent.vars = NULL, min.cells.feature = 3, min.cells.group = 3,
+                                   pseudocount.use = 1, return.thresh = 0.01)
+
+ect_marker_genes <- mutate(ect_marker_genes,pct.diff=pct.1-pct.2)
+id <- intersect(ect_annotLookup$hgnc_symbol,ect_marker_genes$gene)
+x <- ect_marker_genes[ect_marker_genes$gene %in% id,]
+ect_marker_genes$Entrez <- ect_annotLookup$entrezgene_id[match(as.character(ect_marker_genes$gene),ect_annotLookup$hgnc_symbol)]
+ect_marker_genes$description <- ect_annotLookup$description[match(as.character(ect_marker_genes$gene),ect_annotLookup$hgnc_symbol)]
+ect_marker_genes$biotype <- ect_annotLookup$gene_biotype[match(as.character(ect_marker_genes$gene),ect_annotLookup$hgnc_symbol)]
+
+ect_marker_genes <- ect_marker_genes[, c("gene","Entrez","description","biotype","p_val_adj","avg_log2FC","pct.1","pct.2","pct.diff","cluster")]
+head(ect_marker_genes)
+# openxlsx::write.xlsx(ect_marker_genes,"Craniofacial-scRNAseqManuscript/final-tables/SigGenes_Ect_Res0.8Clusters.xlsx")
+```
+
+
+top markers genes
+```{r}
+ect_marker_genes <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/SigGenes_Ect_Res0.8Clusters.xlsx")
+ect_marker_genes_protein <- subset(ect_marker_genes, biotype == "protein_coding")
+
+top_ect <- ect_marker_genes_protein %>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% top_n(10, avg_log2FC)
+top100_ect <- ect_marker_genes_protein %>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% top_n(100, avg_log2FC)
+top100pval_ect <- subset(top100_ect, rowSums(top100_ect[5] < 0.05) > 0)
+
+top50_ect <- ect_marker_genes_protein %>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% top_n(50, avg_log2FC)
+top50pval_ect <- subset(top50_ect, rowSums(top50_ect[5] < 0.05) > 0)
+```
+
+DotPlot of top marker genes
+```{r}
+
+ect_marker_genes_protein <- ect_marker_genes_protein[order(ect_marker_genes_protein$cluster),]
+
+top_initial_ect <- ect_marker_genes_protein %>% group_by(cluster) %>% top_n(10, avg_log2FC)
+top_initial_ect <- top_initial_ect[order(match(top_initial_ect$cluster,as.character(0:21))),]
+
+Idents(ect) <- ect$RNA_snn_res.0.8
+  p <- DotPlot(object = ect, features = unique(top_initial_ect$gene))+ coord_flip()+ RotatedAxis()
+df <- data.frame(Gene = p$data$features.plot, avg.exp = p$data$avg.exp.scaled, pct.exp = p$data$pct.exp, cluster = p$data$id)
+
+out <- DotPlot_scCustom(seurat_object = ect, features = unique(top_initial_ect$gene), colors_use = viridis_plasma_dark_high,flip_axes=T,
+                         remove_axis_titles = T,x_lab_rotate = T) + theme(axis.text.x = element_text(size = 10),axis.text.y = element_text(size = 6, face = "italic"))
+out
+
+
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Ectoderm_Res0.8Clusters_markergenes_dotplot.pdf",width=8.5,height=18)
+out
+dev.off()
+
+```
+
+Functional annotation
+
+```{r}
+df1 <- top100pval_ect[,c(2,10)]
+df1$cluster <- factor(df1$cluster,levels=levels(df1$cluster))
+df1sample <- split(df1$Entrez,df1$cluster)
+length(df1sample)
+initial_types <- names(df1sample)
+
+genelist <- as.list(df1sample)
+background_genes <- unique(ect_marker_genes_protein$Entrez)
+
+BPclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'BP', universe = background_genes)
+BPclusterplot <- pairwise_termsim(BPclusterplot)
+
+CCclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'CC', universe = background_genes)
+CCclusterplot <- pairwise_termsim(CCclusterplot)
+
+MFclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'MF', universe = background_genes)
+MFclusterplot <- pairwise_termsim(MFclusterplot)
+
+Pathwayclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichPathway", pvalueCutoff=0.05, pAdjustMethod = "BH", universe = background_genes)
+Pathwayclusterplot <- pairwise_termsim(Pathwayclusterplot)
+
+KEGGclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichKEGG", pvalueCutoff=0.05, pAdjustMethod = "BH", universe = background_genes)
+KEGGclusterplot <- pairwise_termsim(KEGGclusterplot)
+
+DOclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichDGN", pvalueCutoff=0.05, pAdjustMethod = "BH", universe = background_genes)
+DOclusterplot <- pairwise_termsim(DOclusterplot)
+
+
+options(enrichplot.colours = c("blue", "grey"))
+p1 <- dotplot(BPclusterplot, showCategory = 5, font.size = 6, title = "GO: Biological Process", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("orange", "grey"))
+p2 <- dotplot(CCclusterplot, showCategory = 5, font.size = 6, title = "GO: Cellular Component", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("green", "grey"))
+p3 <- dotplot(MFclusterplot, showCategory = 5, font.size = 6, title = "GO: Molecular Function", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("brown", "grey"))
+p4 <- dotplot(Pathwayclusterplot, showCategory = 10, font.size = 6, title = "Reactome Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("yellow", "grey"))
+p5 <- dotplot(KEGGclusterplot, showCategory = 10, font.size = 6, title = "KEGG Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("red", "grey"))
+p6 <- dotplot(DOclusterplot, showCategory = 10, font.size = 6, title = "DisGeNet", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+
+p1
+p2
+p3
+p4
+p5
+p6
+
+
+```
+
+```{r}
+ect_annot_list <- list(BP =BPclusterplot, CC=CCclusterplot, MF = MFclusterplot, Reactome=Pathwayclusterplot,
+                          KEGG=KEGGclusterplot, DisGeNet=DOclusterplot)
+saveRDS(ect_annot_list, "human_face_ect_Res0.8Clusters_functional-annotation_lists_27Mar.rds")
+
+ect_annot_list <- readRDS("human_face_ect_Res0.8Clusters_functional-annotation_lists_27Mar.rds")
+ect_annot_list$BP <- ect_annot_list$BP@compareClusterResult
+ect_annot_list$CC <- ect_annot_list$CC@compareClusterResult
+ect_annot_list$MF <- ect_annot_list$MF@compareClusterResult
+ect_annot_list$Reactome <- ect_annot_list$Reactome@compareClusterResult
+ect_annot_list$KEGG <- ect_annot_list$KEGG@compareClusterResult
+ect_annot_list$DisGeNet <- ect_annot_list$DisGeNet@compareClusterResult
+openxlsx::write.xlsx(ect_annot_list, file = "Craniofacial-scRNAseqManuscript/final-tables/human_face_ect_Res0.8Clusters_functional-annotation.xlsx",
+                     sheetName = names(ect_annot_list), rowNames = FALSE)
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Ectoderm_Res0.8Clusters_Top10_FunctionalEnrichment_dotplot.pdf",width=8.5,height=16)
+p1
+p2
+p3
+p4
+p5
+p6
+dev.off()
+```
+
+Mouse ectoderm analysis
+```{r}
+mect <- readRDS("mect_final.rds")
+```
+
+```{r}
+stage_colors_mouse <- stage_colors
+names(stage_colors_mouse) <- levels(mect$stage)
+
+p1 <- DimPlot_scCustom(mect, group.by="orig.ident",colors_use = hue_pal()(length(unique(mect$orig.ident))),label=F)
+
+p2 <- DimPlot_scCustom(mect, group.by="stage",colors_use = stage_colors_mouse,label=F)
+
+p3 <- DimPlot_scCustom(mect, group.by="annotation",colors_use = hue_pal()(length(unique(mect$annotation))),
+                       label=T,label.box=T,repel=T) +
+  scale_fill_manual(values = rep("white",length(unique(mect$annotation)))) + NoLegend()
+
+p1
+p2
+p3
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Ect_subtype_final_DimPlots.pdf",height=8.5,width=11)
+p1
+p2
+p3
+dev.off()
+```
+
+Transfer Mouse Ectoderm subtypes to human Ectoderm clusters using rpca
+
+```{r}
+
+annotLookup_ortho_one2one <- orthogene::convert_orthologs(rownames(mect),input_species="mouse",output_species = "human",
+                                                          non121_strategy = "drop_both_species", method="gprofiler") 
+
+mect1 <- mect[which(rownames(mect)%in%annotLookup_ortho_one2one$input_gene),]
+rownames(mect1) <- rownames(annotLookup_ortho_one2one)[match(rownames(mect1),annotLookup_ortho_one2one$input_gene)]
+
+
+Idents(mect1) <- mect1$annotation
+anchors <- FindTransferAnchors(reference = mect1, query = ect, reduction = 'rpca', normalization.method = "LogNormalize", dims = 1:30,features = rownames(mect1))
+
+# anchors <- readRDS("human_face_ect_allMtoH_anchors_cellrangerARC-raw_emptyDrops_singlets_27Mar.rds")
+predicted.id <- TransferData(anchorset = anchors, refdata = Idents(mect1), weight.reduction = ect[['harmony']],dims = 1:30)
+ect$predicted_rpca <- predicted.id$predicted.id
+
+```
+
+Confusion matrix from rpca predicted cell labels
+
+```{r}
+confusionMat_ect <- as.data.frame(table(ect$predicted_rpca,ect$RNA_snn_res.0.8))
+confusionMat_ect <- dcast(confusionMat_ect, Var1 ~ Var2, value.var = "Freq")
+rownames(confusionMat_ect) <- confusionMat_ect[,1]
+confusionMat_ect <- confusionMat_ect[,-1]
+
+pheatmap(t(confusionMat_ect), scale="row")
+ectsubtype_table<-as.data.frame(apply(confusionMat_ect,2,function(x) rownames(confusionMat_ect)[which.max(x)]))
+ectsubtype_table[,1] <- make.names(ectsubtype_table[,1],unique = T)
+ect$subtype1_rpca <- ectsubtype_table[match(ect$RNA_snn_res.0.8,rownames(ectsubtype_table)),1]
+
+DimPlot(ect,group.by="RNA_snn_res.0.8",label=T) + NoLegend()
+```
+
+Rpca confusion matrix by subtype1
+
+```{r}
+confusionMat_ect_subtype1_rpca <- confusionMat_ect
+colnames(confusionMat_ect_subtype1_rpca) <- ect$subtype1_rpca[match(colnames(confusionMat_ect_subtype1_rpca),ect$RNA_snn_res.0.8)]
+
+pheatmap(t(confusionMat_ect_subtype1_rpca), scale="row")
+DimPlot(ect,group.by="subtype1_rpca",label=T) + NoLegend()
+```
+
+```{r,cache=F}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Ectoderm_mouse_label_transfer_rpca_confusionMatrix_heatmap.pdf")
+
+p1 <- pheatmap(t(confusionMat_ect), scale="row",angle_col=45, main="Ectoderm Mouse vs. Human: RPCA Confusion Matrix")
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))  # Reduce plot size to create margins
+p1
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human Res 0.8 Clusters", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+p2 <- pheatmap(t(confusionMat_ect_subtype1_rpca), scale="row",angle_col=45, main="Ectoderm Mouse vs. Human: RPCA Confusion Matrix")
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))  # Reduce plot size to create margins
+p2
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human RPCA Subtypes", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+dev.off()
+```
+
+
+Rpca Ectoderm subtype prediction scores
+
+```{r}
+ect$predicted.score_rpca <- rep(0,ncol(ect))
+identical(rownames(predicted.id),colnames(ect))
+for (cell in 1:nrow(predicted.id)){
+  ect$predicted.score_rpca[cell] <- predicted.id[cell,match(as.character(strsplit2(ect$subtype1_rpca[cell],split="\\.[0-9]")[,1]),
+                                                       gsub("prediction.score.","",colnames(predicted.id)))]
+}
+
+```
+
+```{r}
+ect$subtype1_rpca <- factor(ect$subtype1_rpca)
+p <- SCpubr::do_BoxPlot(sample = ect,
+                        feature = "predicted.score_rpca",
+                        group.by = "subtype1_rpca",
+                        legend.position = "right",
+                        plot.title="RPCA prediction scores")
+p + NoLegend()
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Ectoderm_subtype1_rpca_predictionscores_boxplot.pdf",width=11,height=8.5)
+p + NoLegend()
+dev.off()
+```
+
+Transfer Mouse Ectoderm subtypes to human Ectoderm clusters using cca
+
+```{r}
+
+anchors_cca <- FindTransferAnchors(reference = mect1, query = ect, reduction = 'cca', normalization.method = "LogNormalize", dims = 1:30,features = rownames(mect1))
+
+# anchors_cca <- readRDS("/scr1/users/manchela/Data/human_face_ect_allMtoH_cca_anchors_cellrangerARC-raw_emptyDrops_singlets_27Mar.rds")
+predicted.id <- TransferData(anchorset = anchors_cca, refdata = Idents(mect1), weight.reduction = ect[['harmony']],dims = 1:30)
+ect$predicted_cca <- predicted.id$predicted.id
+
+```
+
+Confusion matrix from cca predicted cell labels
+
+```{r}
+confusionMat_ect <- as.data.frame(table(ect$predicted_cca,ect$RNA_snn_res.0.8))
+confusionMat_ect <- dcast(confusionMat_ect, Var1 ~ Var2, value.var = "Freq")
+rownames(confusionMat_ect) <- confusionMat_ect[,1]
+confusionMat_ect <- confusionMat_ect[,-1]
+
+pheatmap(t(confusionMat_ect), scale="row")
+ectsubtype_table<-as.data.frame(apply(confusionMat_ect,2,function(x) rownames(confusionMat_ect)[which.max(x)]))
+ectsubtype_table[,1] <- make.names(ectsubtype_table[,1],unique = T)
+ect$subtype1_cca <- ectsubtype_table[match(ect$RNA_snn_res.0.8,rownames(ectsubtype_table)),1]
+
+DimPlot(ect,group.by="RNA_snn_res.0.8",label=T) + NoLegend()
+```
+
+cca confusion matrix by subtype1
+
+```{r}
+confusionMat_ect_subtype1_cca <- confusionMat_ect
+colnames(confusionMat_ect_subtype1_cca) <- ect$subtype1_cca[match(colnames(confusionMat_ect_subtype1_cca),ect$RNA_snn_res.0.8)]
+
+pheatmap(t(confusionMat_ect_subtype1_cca), scale="row")
+DimPlot(ect,group.by="subtype1_cca",label=T) + NoLegend()
+```
+
+```{r,cache=F}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Ectoderm_mouse_label_transfer_cca_confusionMatrix_heatmap.pdf")
+
+p1 <- pheatmap(t(confusionMat_ect), scale="row",angle_col=45, main="Ectoderm Mouse vs. Human: CCA Confusion Matrix")
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))  # Reduce plot size to create margins
+p1
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human Res 0.8 Clusters", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+p2 <- pheatmap(t(confusionMat_ect_subtype1_cca), scale="row",angle_col=45, main="Ectoderm Mouse vs. Human: CCA Confusion Matrix")
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))  # Reduce plot size to create margins
+p2
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human CCA Subtypes", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+dev.off()
+```
+
+cca Ectoderm subtype prediction scores
+
+```{r}
+ect$predicted.score_cca <- rep(0,ncol(ect))
+identical(rownames(predicted.id),colnames(ect))
+for (cell in 1:nrow(predicted.id)){
+  if (ect$subtype1_cca[cell]== "dental.2"){
+    ect$predicted.score_cca[cell] <-predicted.id[cell,match(as.character(ect$subtype1_cca[cell]),
+                                                       gsub("prediction.score.","",colnames(predicted.id)))]
+    
+  } else {
+  ect$predicted.score_cca[cell] <- predicted.id[cell,match(as.character(strsplit2(ect$subtype1_cca[cell],split="\\.[0-9]$")[,1]),
+                                                       gsub("prediction.score.","",colnames(predicted.id)))]
+  }
+}
+
+```
+
+```{r}
+ect$subtype1_cca <- factor(ect$subtype1_cca)
+p <- SCpubr::do_BoxPlot(sample = ect,
+                        feature = "predicted.score_cca",
+                        group.by = "subtype1_cca",
+                        legend.position = "right",
+                        plot.title="cca prediction scores")
+p + NoLegend()
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Ectoderm_subtype1_cca_predictionscores_boxplot.pdf",width=11,height=8.5)
+p + NoLegend()
+dev.off()
+```
+
+```{r}
+DimPlot(ect,group.by="subtype1_rpca",label=T) + NoLegend()
+DimPlot(ect,group.by="subtype1_cca",label=T) + NoLegend()
+
+as.data.frame(table(ect$RNA_snn_res.0.8,ect$subtype1_rpca,ect$subtype1_cca)) %>%filter(Freq!=0)
+
+##differences between rpca and cca
+
+# cluster 2: rpca: palate, cca: dental.2
+# cluster 6: rpca: fusion.zone, cca: dental.2
+# cluster 11: rpca: palate.surface, cca: dental.2
+# cluster 21: rpca: fusion.zone, cca: dental.2
+# cluster 5: rpca: fusion.zone, cca: palate
+# cluster 18: pca: palate.surface, cca:palate
+```
+
+SAMap for further correcting Ectoderm subtype annotations
+
+```{r}
+MappingTable <- read.table("/scr1/users/manchela/Data/Multiome/Humanface/GEX/SAMap/SAMapOutput_MappingTable_human-mouse_ect_27Mar.txt", sep = '\t',header = 1,row.names = 1)
+MappingTable <-as.matrix(MappingTable[grep("mo",rownames(MappingTable)),grep("hu",colnames(MappingTable))])
+
+human.celltype.match <- data.frame(x=paste0("hu_",0:(length(levels(ect$RNA_snn_res.0.8))-1)),y=levels(ect$RNA_snn_res.0.8))
+mouse.celltype.match <- data.frame(x=paste0("mo_",0:(length(levels(mect$annotation))-1)),y=levels(mect$annotation))
+
+rownames(MappingTable) <- mouse.celltype.match$y[match(rownames(MappingTable),mouse.celltype.match$x)]
+colnames(MappingTable) <- human.celltype.match$y[match(colnames(MappingTable),human.celltype.match$x)]
+
+
+p1 <- pheatmap(t(MappingTable),scale="row",angle_col=45, main="SAMap - Ectoderm Mouse vs. Human")
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))  # Reduce plot size to create margins
+p1
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human Res 0.8 Clusters", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+
+
+```
+
+```{r}
+
+SAMap_table<-as.data.frame(apply(MappingTable,2,function(x) rownames(MappingTable)[which.max(x)]))
+SAMap_table[,1] <- make.names(SAMap_table[,1],unique=T)
+ect$subtype1_SAMap <- as.character(SAMap_table[match(ect$RNA_snn_res.0.8,rownames(SAMap_table)),1])
+
+# cluster 2: rpca: palate, cca: dental.2, SAMap: dental.1
+# cluster 6: rpca: fusion.zone, cca: dental.2, SAMap: dental.2
+# cluster 11: rpca: palate.surface, cca: dental.2, SAMap: palate.surface
+# cluster 21: rpca: fusion.zone, cca: dental.2, SAMap: dental.2
+# cluster 5: rpca: fusion.zone, cca: palate, SAMap: fusion.zone
+# cluster 18: pca: palate.surface, cca:palate, SAMap: palate.surface
+
+DimPlot(ect,group.by="subtype1_SAMap",label=T) + NoLegend()
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Ectoderm_SAMap_matrix_heatmap.pdf")
+
+# colnames(MappingTable) <- mes$RNA_snn_res.0.8[match(colnames(MappingTable),as.character(ect$subtype1_SAMap))]
+p1 <- pheatmap(t(MappingTable),scale="row",angle_col=45, main="SAMap - Ectoderm Mouse vs. Human")
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))  # Reduce plot size to create margins
+p1
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human Res 0.8 Clusters", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+
+colnames(MappingTable) <- mes$subtype1_SAMap[match(colnames(MappingTable),as.character(ect$RNA_snn_res.0.8))]
+p1 <- pheatmap(t(MappingTable),scale="row",angle_col=45, main="SAMap - Ectoderm Mouse vs. Human")
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))  # Reduce plot size to create margins
+p1
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human SAMap Subtypes", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+dev.off()
+```
+
+
+
+
+```{r}
+as.data.frame(table(ect$RNA_snn_res.0.8,ect$subtype1_rpca,ect$subtype1_cca,ect$subtype1_SAMap)) %>% filter(Freq!=0)
+
+DimPlot(ect,group.by="RNA_snn_res.0.8",label=T)+NoLegend()
+DimPlot(ect,group.by="subtype1_rpca",label=T)+NoLegend()
+
+```
+
+Finding marker genes for human and mouse subtypes for GeneOverlap
+
+```{r}
+
+ect_marker_genes <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/SigGenes_Ect_Res0.8Clusters.xlsx")
+
+# match with mouse one-to-one orthologs
+ect_marker_genes_mouseOverlap <- ect_marker_genes[which(ect_marker_genes$gene%in%rownames(mect1)),]
+
+# get top 100 marker genes for each human ectoderm cluster
+top100_human_ect_marker_genes <- list()
+for (i in unique(ect_marker_genes$cluster)){
+  top100_human_ect_marker_genes[[i]] <- ect_marker_genes_mouseOverlap[which(ect_marker_genes_mouseOverlap$cluster==i),] %>% filter(p_val_adj < 0.05)%>%
+    top_n(100, avg_log2FC)%>% pull(gene)
+}
+
+
+# find marker genes for each mouse ectenchyme subtype
+Idents(mect1) <- mect1$annotation
+mouse_ect_marker_genes <- FindAllMarkers(mect1, assay = "RNA" ,logfc.threshold = 0.25, test.use = "wilcox", min.pct = 0.1, 
+                                         min.diff.pct = -Inf, node = NULL, verbose = TRUE,
+                                         only.pos = TRUE, max.cells.per.ident = Inf, random.seed = 1,
+                                         latent.vars = NULL, min.cells.feature = 3, min.cells.group = 3,
+                                         pseudocount.use = 1, return.thresh = 0.01)
+
+mouse_ect_marker_genes <- mutate(mouse_ect_marker_genes,pct.diff=pct.1-pct.2)
+mouse_ect_marker_genes$mo_gene <- annotLookup_ortho_one2one$input_gene[match(mouse_ect_marker_genes$gene,rownames(annotLookup_ortho_one2one))]
+# openxlsx::write.xlsx(mouse_ect_marker_genes,"Craniofacial-scRNAseqManuscript/final-tables/Mouse_SigGenes_ect_SubTypes.xlsx")
+mouse_ect_marker_genes <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/Mouse_SigGenes_ect_SubTypes.xlsx")
+
+# get top 100 marker genes for each mouse ectenchyme subtype
+top100_mouse_ect_marker_genes <- list()
+for (i in unique(mouse_ect_marker_genes$cluster)){
+  top100_mouse_ect_marker_genes[[i]] <- mouse_ect_marker_genes[which(mouse_ect_marker_genes$cluster==i),] %>%
+    filter(p_val_adj < 0.05)%>%top_n(100, avg_log2FC)%>% pull(gene)
+}
+
+
+```
+
+GeneOverlap for ectoderm subtypes
+
+```{r}
+
+gs.markers= length(intersect(rownames(annotLookup_ortho_one2one),ect_marker_genes$gene))
+
+gom.obj <- newGOM(top100_human_ect_marker_genes, top100_mouse_ect_marker_genes, gs.markers)
+
+ect_geneoverlap_pval <- getMatrix(gom.obj,name = "pval")
+ect_geneoverlap_pval <- t(apply(ect_geneoverlap_pval,1,function(x) p.adjust(x, method = "BH")))
+ect_geneoverlap_pval <- -log(ect_geneoverlap_pval,10)
+formatted_values <- t(apply(ect_geneoverlap_pval,1,function(x) ifelse(as.numeric(x) < -log(0.05,10), "NS", sprintf("%.2f", x))))
+
+
+p <- pheatmap(
+  mat = ect_geneoverlap_pval[-which(rowSums(ect_geneoverlap_pval)==0),],
+  clustering_distance_rows = "euclidean",
+  clustering_distance_cols = "euclidean",
+  clustering_method = "complete",
+  display_numbers = formatted_values[-which(rowSums(ect_geneoverlap_pval)==0),],
+  scale="row",
+  fontsize_row = 15,
+  fontsize_col = 15,
+  number_color="white",
+  color = viridis(n = 50, option = "C", direction = -1),
+  main = "Top 100 DEGs: Ectoderm Cell Subtypes",
+)
+
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))
+p
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human Subtypes", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+```
+
+```{r}
+
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Ectoderm_Res0.8_GeneOverlap_human_mouse_top100genes_heatmap.pdf",height=11,width=8.5)
+
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))  # Reduce plot size to create margins
+p
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human Res 0.8 Clusters", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+dev.off()
+```
+
+
+```{r}
+as.data.frame(table(ect$RNA_snn_res.0.8,ect$subtype_final)) %>% filter(Freq!=0) %>% arrange(Var1)
+```
+
+Finalizing Ectoderm Subtype annotations (from rpca, cca, SAMap, GeneOverlap, and functional annotation)
+
+```{r}
+
+# cluster 2: rpca: palate, cca: dental.2, SAMap: dental.1 -----> dental.1
+# cluster 6: rpca: fusion.zone, cca: dental.2, SAMap: dental.2 -----> dental.2
+# cluster 11: rpca: palate.surface, cca: dental.2, SAMap: palate.surface -----> palate.surface
+# cluster 21: rpca: fusion.zone, cca: dental.2, SAMap: dental.2 -----> dental.2
+# cluster 5: rpca: fusion.zone, cca: palate, SAMap: fusion.zone -----> fusion.zone
+# cluster 18: rpca: palate.surface, cca:palate, SAMap: palate.surface -----> palate.surface
+
+ect$subtype_final <- as.character(ect$subtype1_rpca)
+ect$subtype_final[which(ect$RNA_snn_res.0.8==19)] <- 'thyroid'
+ect$subtype_final[which(ect$RNA_snn_res.0.8==20)] <- 'eye.ect'
+ect$subtype_final[which(ect$RNA_snn_res.0.8==9)] <- 'EMT' # labeled as ect.EBF in mouse data
+ect$subtype_final[which(ect$RNA_snn_res.0.8==2)] <- "dental1"
+ect$subtype_final[which(ect$RNA_snn_res.0.8==21)] <- "dental2"
+ect$subtype_final[which(ect$RNA_snn_res.0.8==6)] <- "ect.GDNF"
+ect$subtype_final[which(ect$RNA_snn_res.0.8==14)] <- "surface4"
+
+ect$subtype_final[which(ect$subtype_final=="palate.surface")] <- "palate.surface.3"
+
+ect$subtype_final <-factor(ect$subtype_final,levels=sort(unique(ect$subtype_final)))
+
+DimPlot(ect,group.by="subtype_final",label=T)+NoLegend()
+```
+
+```{r}
+ect$subtype_final <- ect$subtype_final
+ect$subtype_final_reduced <- strsplit2(as.character(ect$subtype_final),split="\\.[0-9]$")[,1]
+ect$subtype_final_reduced <- factor(ect$subtype_final_reduced, levels= sort(unique(ect$subtype_final_reduced)))
+
+p1 <- DimPlot(ect,group.by="subtype_final_reduced",label=T)
+p2 <- DimPlot(ect,group.by="subtype_final",label=T)
+p1
+p2
+```
+
+
+```{r}
+ect_colors <- DiscretePalette_scCustomize(num_colors = length(unique(as.character(ect$subtype_final))),
+                                          palette = "alphabet")
+names(ect_colors) <- levels(ect$subtype_final)
+
+ect$color <- as.character(ect_colors)[match(ect$subtype_final,names(ect_colors))]
+ect_plot_colors <- ect$color 
+names(ect_plot_colors) <- ect$subtype_final
+  
+
+```
+
+```{r}
+
+p1 <- DimPlot_scCustom(ect, colors_use = ect_plot_colors, group.by="subtype_final",label=T,label.box=T,repel=T) +
+  scale_fill_manual(values = rep("white",length(unique(ect$subtype_final))))
+p2 <- DimPlot_scCustom(ect, group.by="subtype_final_reduced",label=T,label.box=T,repel=T) +
+  scale_fill_manual(values = rep("white",length(unique(ect$subtype_final_reduced))))
+
+p1
+p2
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Ectoderm_subtype_final_annotations_DimPlots.pdf",width=11,height=8.5)
+p1
+p2
+dev.off()
+```
+
+
+Bar plots by stage
+```{r}
+ect_subtype_colors <- unique(ect_plot_colors)
+names(ect_subtype_colors) <- unique(names(ect_plot_colors))
+
+ect$subtype_final <- factor(ect$subtype_final, levels=names(sort(table(ect$subtype_final),decreasing = T)))
+
+p1 <- SCpubr::do_BarPlot(ect, 
+                   group.by = "stage",
+                   split.by = "subtype_final",
+                   position = "fill",
+                   flip = FALSE, 
+                   legend.position = "right",
+                   colors.use = stage_colors)
+p1
+
+p2 <- SCpubr::do_BarPlot(ect, 
+                   group.by = "stage",
+                   split.by = "subtype_final",
+                   position = "stack",
+                   flip = FALSE,
+                   legend.position = "right",
+                   colors.use = stage_colors)
+p2
+
+
+p3 <- SCpubr::do_BarPlot(ect, 
+                   group.by = "subtype_final",
+                   split.by = "stage",
+                   position = "fill",
+                   flip = FALSE, 
+                   legend.position = "right",
+                   colors.use = ect_subtype_colors)
+p3
+
+p4 <- SCpubr::do_BarPlot(ect, 
+                   group.by = "subtype_final",
+                   split.by = "stage",
+                   position = "stack",
+                   flip = FALSE, 
+                   legend.position = "right",
+                   colors.use = ect_subtype_colors)
+p4
+
+```
+
+```{r}
+subtype_subset <- c("surface2","NaP","dental1","palate.1","palate.surface.1","fusion.zone","ect.GDNF","auditory","periderm",
+                    "EMT")
+ect_subset <- ect[,which(ect$subtype_final%in%subtype_subset)]
+ect_subset$subtype_final <- factor(as.character(ect_subset$subtype_final),
+                                   levels=names(sort(table(as.character(ect_subset$subtype_final)),decreasing = T)))
+```
+
+
+```{r}
+ect_subtype_colors_subset <- ect_subtype_colors[match(subtype_subset,names(ect_subtype_colors))]
+
+
+p5 <- SCpubr::do_BarPlot(ect_subset, 
+                   group.by = "stage",
+                   split.by = "subtype_final",
+                   position = "fill",
+                   flip = FALSE, 
+                   legend.position = "right",
+                   colors.use = stage_colors)
+p5
+
+p6 <- SCpubr::do_BarPlot(ect_subset, 
+                   group.by = "stage",
+                   split.by = "subtype_final",
+                   position = "stack",
+                   flip = FALSE,
+                   legend.position = "right",
+                   colors.use = stage_colors)
+p6
+
+
+p7 <- SCpubr::do_BarPlot(ect_subset, 
+                   group.by = "subtype_final",
+                   split.by = "stage",
+                   position = "fill",
+                   flip = FALSE, 
+                   legend.position = "right",
+                   colors.use = ect_subtype_colors_subset)
+p7
+
+p8 <- SCpubr::do_BarPlot(ect_subset, 
+                   group.by = "subtype_final",
+                   split.by = "stage",
+                   position = "stack",
+                   flip = FALSE, 
+                   legend.position = "right",
+                   colors.use = ect_subtype_colors_subset)
+p8
+
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Ect_subtype_final_stage_barplot.pdf",width=11,height=8.5)
+p1
+p2
+p3
+p4
+p5
+p6
+p7
+p8
+dev.off()
+```
+
+
+```{r}
+tf_table <- read.table("human_tf_Lambertetal_PMID29425488.txt",sep="\t",header = T)
+tf_table$gene.name <- ect_annotLookup$hgnc_symbol[match(tf_table$Human_TF,ect_annotLookup$ensembl_gene_id)]
+```
+
+
+```{r}
+sig_genes_ect_subtypes <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/SigGenes_Ect_Res0.8Clusters.xlsx")
+sig_genes_ect_subtypes$cluster <- ect$subtype_final[match(sig_genes_ect_subtypes$cluster,ect$RNA_snn_res.0.8)]
+# openxlsx::write.xlsx(sig_genes_ect_subtypes,"Craniofacial-scRNAseqManuscript/final-tables/SigGenes_ect_SubTypes_8Apr.xlsx")
+
+sig_genes_ect_subtypes$ensemblID <- ect_annotLookup$ensembl_gene_id[match(sig_genes_ect_subtypes$Entrez,ect_annotLookup$entrezgene_id)]
+
+sig_genes_ect_subtypes$TF <- "No"
+sig_genes_ect_subtypes$TF[which(sig_genes_ect_subtypes$ensemblID%in%tf_table$Human_TF)] <- "Yes"
+
+sig_genes_ect_subtypes_protein <- sig_genes_ect_subtypes %>% filter(biotype == "protein_coding",TF=="Yes")
+
+ect$subtype_final <- factor(ect$subtype_final,levels=sort(unique(ect$subtype_final)))
+
+top_celtype <- sig_genes_ect_subtypes_protein %>% 
+  mutate(cluster = factor(cluster, levels = levels(ect$subtype_final))) %>% 
+  group_by(cluster) %>% top_n(5, avg_log2FC) %>% arrange(cluster)
+
+top100_celltype <- sig_genes_ect_subtypes_protein %>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% top_n(100, avg_log2FC)
+top100pval_celltype <- subset(top100_celltype, rowSums(top100_celltype[5] < 0.05) > 0)
+
+top50_celltype <- sig_genes_ect_subtypes_protein%>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% top_n(50, avg_log2FC)
+top50pval_celltype <- subset(top50_celltype, rowSums(top50_celltype[5] < 0.05) > 0)
+```
+
+TF marker gene dot plot
+```{r}
+sig_genes_ect_subtypes_protein <- sig_genes_ect_subtypes_protein[order(sig_genes_ect_subtypes_protein$cluster),]
+
+top_initial_ect_subtype <- sig_genes_ect_subtypes_protein %>% group_by(cluster) %>% top_n(5, avg_log2FC)
+
+Idents(ect) <- ect$subtype_final
+p <- DotPlot(object = ect, features = unique(top_initial_ect_subtype$gene))+ coord_flip()+ RotatedAxis()
+df <- data.frame(Gene = p$data$features.plot, avg.exp = p$data$avg.exp.scaled, pct.exp = p$data$pct.exp, cluster = p$data$id)
+
+out <- DotPlot_scCustom(seurat_object = ect, features = unique(top_initial_ect_subtype$gene), colors_use = viridis_plasma_dark_high,flip_axes=T,
+                         remove_axis_titles = T,x_lab_rotate = T) + theme(axis.text.x = element_text(size = 10),axis.text.y = element_text(size = 6, face = "italic"), legend.position = "bottom",legend.justification = "center", legend.title = element_text(size = 10, hjust=0.5),legend.text = element_text(size = 10))+guides(color = guide_colorbar(title.position = "top",title = "Average Expression"),size = guide_legend(title.position = "top",title = "Percent Expressed")) 
+out
+
+
+Idents(ect_subset) <- factor(ect_subset$subtype_final,levels=subtype_subset[na.omit(match(levels(ect$subtype_final),subtype_subset))])
+out2 <- DotPlot_scCustom(seurat_object = ect_subset, 
+                         features = unique(top_initial_ect_subtype$gene[which(top_initial_ect_subtype$cluster%in%subtype_subset)]),
+                         colors_use = viridis_plasma_dark_high,flip_axes=T,remove_axis_titles = T,x_lab_rotate = T) + 
+  theme(axis.text.x = element_text(size = 10),axis.text.y = element_text(size = 6, face = "italic"),
+        legend.position = "bottom",legend.justification = "center", legend.title = element_text(size = 10, hjust=0.5),
+        legend.text = element_text(size = 10))+guides(color = guide_colorbar(title.position = "top",title = "Average Expression"),
+                                                      size = guide_legend(title.position = "top",title = "Percent Expressed")) 
+out2
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/ect_subtype_final_TF_markergenes_dotplot_all.pdf",width=10,height=11)
+out
+dev.off()
+
+pdf("Craniofacial-scRNAseqManuscript/final-figs/ect_subtype_final_TF_markergenes_dotplot.pdf",width=8,height=11)
+out2
+dev.off()
+
+```
+
+```{r}
+
+Clustered_DotPlot(ect, features = c("EBF1","EBF2","EBF3"),group.by = "subtype_final",show_ident_colors=FALSE,row_label_size=10)
+```
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Ectoderm_subtype_final_EBFgenes_ClusteredDotPlot.pdf",width=8,height=4)
+Clustered_DotPlot(ect, features = c("EBF1","EBF2","EBF3"),group.by = "subtype_final",show_ident_colors=FALSE,row_label_size=10)
+dev.off()
+```
+
+
+
+Cell cycle markers
+```{r}
+ect$S.Score.adjust <- ect$S.Score + abs(min(ect$S.Score))
+ect$G2M.Score.adjust <- ect$G2M.Score + abs(min(ect$G2M.Score))
+
+ect$cellcycle.ratio <- ect$S.Score.adjust / ect$G2M.Score.adjust
+VlnPlot_scCustom(seurat_object = ect, features = "cellcycle.ratio", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final", colors_use = ect_plot_colors) +
+  ylim(c(0,5)) + NoLegend() + geom_hline(yintercept=median(ect$cellcycle.ratio),linetype=2)
+
+VlnPlot_scCustom(seurat_object = ect, features = "S.Score", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final", colors_use = ect_plot_colors) + NoLegend()  + geom_hline(yintercept=median(ect$S.Score),linetype=2)
+
+VlnPlot_scCustom(seurat_object = ect, features = "G2M.Score", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final", colors_use = ect_plot_colors) + NoLegend()  + geom_hline(yintercept=median(ect$G2M.Score),linetype=2)
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Ectoderm_subtype_final_CellCycle_VlnPlot.pdf",width=11,height=8.5)
+VlnPlot_scCustom(seurat_object = ect, features = "cellcycle.ratio", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final", colors_use = ect_plot_colors) +
+  ylim(c(0,5)) + NoLegend() + geom_hline(yintercept=median(ect$cellcycle.ratio),linetype=2)
+
+VlnPlot_scCustom(seurat_object = ect, features = "S.Score", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final", colors_use = ect_plot_colors) + NoLegend()  + geom_hline(yintercept=median(ect$S.Score),linetype=2)
+
+VlnPlot_scCustom(seurat_object = ect, features = "G2M.Score", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final", colors_use = ect_plot_colors) + NoLegend()  + geom_hline(yintercept=median(ect$G2M.Score),linetype=2)
+dev.off()
+```
+
+
+hox genes
+```{r}
+anterior_hox <- c("HOXA1", "HOXA2", "HOXA3", "HOXB1", "HOXB2", "HOXB3", "HOXD1", "HOXD3")
+central_hox <- c("HOXA4", "HOXA5", "HOXA6", "HOXA7", "HOXB4", "HOXB5", "HOXB6", "HOXB7", "HOXB8", "HOXC4", "HOXC5", "HOXC6", "HOXC8", "HOXD4", "HOXD8")
+posterior_hox <-c("HOXA9", "HOXA10", "HOXA11", "HOXA13", "HOXB9", "HOXB13", "HOXC9", "HOXC10", "HOXC11", "HOXC12", "HOXC13", "HOXD9", "HOXD10", "HOXD11", "HOXD12", "HOXD13")
+
+ect <- AddModuleScore(ect, list(anterior_hox), name = "Anterior_ModuleScore")
+ect <- AddModuleScore(ect, list(central_hox), name = "Central_ModuleScore")
+ect <- AddModuleScore(ect, list(posterior_hox), name = "Posterior_ModuleScore")
+
+
+VlnPlot_scCustom(seurat_object = ect, features = "Anterior_ModuleScore1", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final", colors_use = ect_plot_colors) + NoLegend()
+
+VlnPlot_scCustom(seurat_object = ect, features = "Central_ModuleScore1", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final", colors_use = ect_plot_colors) + NoLegend()
+
+VlnPlot_scCustom(seurat_object = ect, features = "Posterior_ModuleScore1", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final", colors_use = ect_plot_colors) + NoLegend()
+
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Ectoderm_subtype_final_HoxModules_VlnPlot.pdf",width=11,height=8.5)
+VlnPlot_scCustom(seurat_object = ect, features = "Anterior_ModuleScore1", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final", colors_use = ect_plot_colors) + NoLegend()
+
+VlnPlot_scCustom(seurat_object = ect, features = "Central_ModuleScore1", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final", colors_use = ect_plot_colors) + NoLegend()
+
+VlnPlot_scCustom(seurat_object = ect, features = "Posterior_ModuleScore1", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final", colors_use = ect_plot_colors) + NoLegend()
+Stacked_VlnPlot(ect,features=c("Anterior_ModuleScore1","Central_ModuleScore1","Posterior_ModuleScore1"),pt.size = 0,group.by="subtype_final", colors_use = ect_plot_colors,x_lab_rotate = 45)
+dev.off()
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Ectoderm_subtype_final_HoxGenes_VlnPlot.pdf",width=11,height=8.5)
+p <- Stacked_VlnPlot(seurat_object = ect, features = anterior_hox,pt.size = 0,group.by="subtype_final",x_lab_rotate = 45)+ NoLegend() +
+  plot_annotation(title = "Anterior HOX Genes", theme = theme(
+    plot.title = element_text(hjust = 0.5,size=16)
+  ))
+
+p
+```
+
+
+GeneOverlap for ect subtypes
+
+```{r}
+
+gs.markers= length(intersect(rownames(annotLookup_ortho_one2one),ect_marker_genes$gene))
+
+names(top100_human_ect_marker_genes) <- ect$subtype_final[match(names(top100_human_ect_marker_genes),ect$RNA_snn_res.0.8)]
+
+names(top100_human_ect_marker_genes) <- paste0("human ",names(top100_human_ect_marker_genes))
+names(top100_mouse_ect_marker_genes) <- paste0("mouse ",names(top100_mouse_ect_marker_genes))
+gom.obj <- newGOM(top100_human_ect_marker_genes, top100_mouse_ect_marker_genes, gs.markers)
+
+ect_geneoverlap_pval <- getMatrix(gom.obj,name = "pval")
+ect_geneoverlap_odds <- getMatrix(gom.obj,name = "odds.ratio")
+formatted_values <- t(apply(ect_geneoverlap_pval,1,function(x) ifelse(as.numeric(x) > 0.05, "NS", sprintf("%.2e", x))))
+
+
+p <- pheatmap(
+  mat = ect_geneoverlap_odds,
+  cluster_cols = T,
+  cluster_rows = T,
+  display_numbers = formatted_values,
+  scale="row",
+  fontsize_row = 13,
+  fontsize_col = 13,fontsize = 12,
+  fontsize_number = 8,
+  number_color="white",angle_col = 45,
+  color = viridis(n = 50, option = "C", direction = -1),
+  main = "Top 100 DEGs: Human vs. Mouse ect Subtypes",
+)
+
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))
+p
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human Subtypes", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Ect_GeneOverlap_human_mouse_subtype_final_top100DEGs_heatmap.pdf",width=15,height=8.5)
+
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))
+p
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 16)) # X-axis title
+grid.text("Human Subtypes", x = -0.02, rot = 90, gp = gpar(fontsize = 16)) # Y-axis title
+
+drawHeatmap(gom.obj, grid.col="Reds",note.col="white")
+dev.off()
+```
+
+```{r}
+ect_subtype_intersect <- getNestedList(gom.obj, name="intersection")
+
+ect_subtype_intersect_longer <- map_df(names(ect_subtype_intersect), function(mouse_cond) {
+  human_cells <- names(ect_subtype_intersect[[mouse_cond]])
+  genes <- unlist(ect_subtype_intersect[[mouse_cond]])
+  
+  tibble(
+    mouse_celltype = rep(mouse_cond, length(genes)),
+    human_celltype = rep(human_cells, sapply(ect_subtype_intersect[[mouse_cond]], length)),
+    gene = genes
+  )
+})
+
+
+human_mouse_shared_ect <- ect_subtype_intersect_longer %>%
+  group_by(mouse_celltype, human_celltype) %>%
+  dplyr::summarize(shared_gene_count = n(), .groups = "drop")
+
+human_mouse_shared_ect <- as.data.frame(human_mouse_shared_ect)
+human_mouse_shared_ect$pval <- rep(NA,nrow(human_mouse_shared_ect))
+for (i in 1:nrow(human_mouse_shared_ect)){
+  human_mouse_shared_ect$pval[i] <- ect_geneoverlap_pval[which(rownames(ect_geneoverlap_pval)==human_mouse_shared_ect$human_celltype[i]),which(colnames(ect_geneoverlap_pval)==human_mouse_shared_ect$mouse_celltype[i])]
+}
+
+human_mouse_shared_ect$pval <- as.numeric(human_mouse_shared_ect$pval)
+human_mouse_shared_ect$sig <- human_mouse_shared_ect$pval
+human_mouse_shared_ect$sig[which(human_mouse_shared_ect$pval>0.05)] <- ""
+human_mouse_shared_ect$sig[which(human_mouse_shared_ect$pval<0.05 & 
+                                   human_mouse_shared_ect$pval>0.001)] <- "*"
+human_mouse_shared_ect$sig[which(human_mouse_shared_ect$pval<0.001 & 
+                                   human_mouse_shared_ect$pval>0.0001)] <- "**"
+human_mouse_shared_ect$sig[which(human_mouse_shared_ect$pval<0.0001)] <- "***"
+
+human_mouse_shared_ect$pval_format <- ifelse(as.numeric(human_mouse_shared_ect$pval) > 0.05, "NS", sprintf("%.2e", human_mouse_shared_ect$pval))
+
+
+ect_colors_alluvial <- ect_colors
+names(ect_colors_alluvial) <- paste0("human ",names(ect_colors_alluvial))
+
+p <- ggplot(human_mouse_shared_ect[which(human_mouse_shared_ect$shared_gene_count>=5),],
+            aes(axis1 = mouse_celltype, axis2 = human_celltype,
+                y = shared_gene_count,label=pval_format)) +  
+  geom_alluvium(aes(fill = human_celltype), width = 0.2, alpha = 0.8) +
+  geom_stratum(aes(fill = human_celltype)) +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum))) +
+  geom_text(stat = "flow", nudge_x = 0.2,size=3,hjust=-0.05) +
+  scale_fill_manual(values = ect_colors_alluvial, na.value = NA) + 
+  theme_minimal() +
+  labs(title = "Gene Overlap Between Mouse & Human Ectoderm Subtypes",
+       y="") +
+  NoLegend() +
+   theme(panel.grid.major = element_blank(), 
+         panel.grid.minor = element_blank(),
+         plot.title = element_text(hjust=0.5),
+         axis.text.x = element_blank(),
+         axis.text.y = element_blank())
+
+p
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Human_Mouse_Ect_Subtypes_>5geneoverlap_AlluvialPlot.pdf",width=11,height=10)
+p
+dev.off()
+```
+
+plotting SAMap output
+```{r}
+MappingTable <- read.table("/scr1/users/manchela/Data/Multiome/Humanface/GEX/SAMap/SAMapOutput_MappingTable_human-mouse_ect_27Mar.txt", sep = '\t',header = 1,row.names = 1)
+MappingTable <-as.matrix(MappingTable[grep("mo",rownames(MappingTable)),grep("hu",colnames(MappingTable))])
+
+human.celltype.match <- data.frame(x=colnames(MappingTable),y=strsplit2(colnames(MappingTable),split="_")[,2])
+mouse.celltype.match <- data.frame(x=rownames(MappingTable),y=strsplit2(rownames(MappingTable),split="_")[,2])
+
+
+ect_annot_table <- as.data.frame(cbind(as.numeric(ect$RNA_snn_res.0.8)-1,as.character(ect$subtype_final)))
+ect_annot_table <- ect_annot_table[-which(duplicated(ect_annot_table)),]
+
+mouse.celltype.match <- data.frame(x=paste0("mo_",0:(length(levels(mect$annotation))-1)),y=levels(mect$annotation))
+
+colnames(MappingTable) <- paste0("human ", ect_annot_table$V2[match(human.celltype.match$y,ect_annot_table$V1)])
+
+rownames(MappingTable) <-paste0("mouse ",mouse.celltype.match$y[match(rownames(MappingTable),mouse.celltype.match$x)])
+
+MappingTable <- t(MappingTable)
+
+p2 <- pheatmap(MappingTable,display_numbers = round(MappingTable,2),scale="row", main="SAMap - Ectoderm Mouse vs. Human",angle_col = "45",color = viridis(n = 50, option = "C", direction = -1),number_color = "white",fontsize_number = 10)
+
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))  # Reduce plot size to create margins
+p2
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human Subtypes", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Ect_SAMap_human_mouse_subtype_final_heatmap.pdf",width=15,height=8.5)
+
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))  # Reduce plot size to create margins
+p2
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human Subtypes", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+dev.off()
+```
+
+
+Performing functional annotation for human Ectoderm subtypes
+```{r}
+ect_annot_list <- readRDS("human_face_ect_Res0.8Clusters_functional-annotation_lists_27Mar.rds")
+for (i in names(ect_annot_list)){
+  ect_annot_list[[i]]@compareClusterResult$Cluster <- as.character(ect_annot_list[[i]]@compareClusterResult$Cluster)
+  ect_annot_list[[i]]@compareClusterResult$Cluster <- 
+    ect$subtype_final[match(ect_annot_list[[i]]@compareClusterResult$Cluster,ect$RNA_snn_res.0.8)]
+  ect_annot_list[[i]]@compareClusterResult <- ect_annot_list[[i]]@compareClusterResult %>% arrange(Cluster)
+}
+
+BPclusterplot <- ect_annot_list$BP
+options(enrichplot.colours = c("blue", "grey"))
+p1 <- dotplot(BPclusterplot, showCategory = 5, font.size = 6, title = "GO: Biological Process", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1) )
+
+CCclusterplot <- ect_annot_list$CC
+options(enrichplot.colours = c("orange", "grey"))
+p2 <- dotplot(CCclusterplot, showCategory = 5, font.size = 6, title = "GO: Cellular Component", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1))
+
+MFclusterplot <- ect_annot_list$MF
+options(enrichplot.colours = c("green", "grey"))
+p3 <- dotplot(MFclusterplot, showCategory = 5, font.size = 6, title = "GO: Molecular Function", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1))
+
+Pathwayclusterplot <- ect_annot_list$Reactome
+options(enrichplot.colours = c("brown", "grey"))
+p4 <- dotplot(Pathwayclusterplot, showCategory = 5, font.size = 6, title = "Reactome Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1))
+
+KEGGclusterplot <- ect_annot_list$KEGG
+options(enrichplot.colours = c("yellow", "grey"))
+p5 <- dotplot(KEGGclusterplot, showCategory = 5, font.size = 6, title = "KEGG Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1))
+
+DOclusterplot <- ect_annot_list$DisGeNet
+options(enrichplot.colours = c("red", "grey"))
+p6 <- dotplot(DOclusterplot, showCategory = 5, font.size = 6, title = "DisGeNet", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1))
+
+p1
+p2
+p3
+p4
+p5
+p6
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Ectoderm_subtype_final_Top5_FunctionalEnrichment_dotplot.pdf",width=8.5,height=16)
+p1
+p2
+p3
+p4
+p5
+p6
+dev.off()
+```
+
+```{r}
+pdf(file = "Craniofacial-scRNAseqManuscript/final-figs/Ectoderm_subtype_final_Top5_FunctionalEnrichment_dotplot_plotgrid.pdf", w = 17, h = 22)
+cowplot::plot_grid(p1, p2, p3, p4, p5, p6, ncol=2, labels=LETTERS[1:6])
+dev.off()
+```
+
+mouse ectoderm TF marker dot plot
+```{r}
+sig_genes_mect_subtypes <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/Mouse_SigGenes_ect_SubTypes.xlsx")
+sig_genes_mect_subtypes <- sig_genes_mect_subtypes[order(sig_genes_mect_subtypes$cluster),]
+
+sig_genes_mect_subtypes$ensemblID <- ect_annotLookup$ensembl_gene_id[match(sig_genes_mect_subtypes$gene,ect_annotLookup$hgnc_symbol)]
+sig_genes_mect_subtypes$biotype <- ect_annotLookup$gene_biotype[match(sig_genes_mect_subtypes$gene,ect_annotLookup$hgnc_symbol)]
+
+sig_genes_mect_subtypes$TF <- "No"
+sig_genes_mect_subtypes$TF[which(sig_genes_mect_subtypes$ensemblID%in%tf_table$Human_TF)] <- "Yes"
+
+sig_genes_mect_subtypes_protein <- sig_genes_mect_subtypes %>% filter(biotype == "protein_coding",TF=="Yes",p_val_adj<0.05)
+
+top_initial_mect_subtype <- sig_genes_mect_subtypes_protein %>% group_by(cluster) %>% top_n(5, avg_log2FC)
+
+Idents(mect1) <- factor(as.character(mect1$annotation),levels=sort(unique(as.character(mect1$annotation))))
+  p <- DotPlot(object = mect1, features = unique(top_initial_mect_subtype$gene))+ coord_flip()+ RotatedAxis()
+df <- data.frame(Gene = p$data$features.plot, avg.exp = p$data$avg.exp.scaled, pct.exp = p$data$pct.exp, cluster = p$data$id)
+
+out <- DotPlot_scCustom(seurat_object = mect1, features = unique(top_initial_mect_subtype$gene), colors_use = viridis_plasma_dark_high,flip_axes=T,
+                         remove_axis_titles = T,x_lab_rotate = T) + 
+  theme(axis.text.x = element_text(size = 10),axis.text.y = element_text(size = 6, face = "italic"),
+        legend.position = "bottom",legend.justification = "center", legend.title = element_text(size = 10, hjust=0.5),
+        legend.text = element_text(size = 10))+guides(color = guide_colorbar(title.position = "top",title = "Average Expression"),
+                                                      size = guide_legend(title.position = "top",title = "Percent Expressed")) 
+out
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Ect_subtype_final_TF_markergenes_dotplot.pdf",width=10,height=14)
+out
+dev.off()
+
+```
+
+Elbow plot for optimal number of clusters
+```{r}
+set.seed(123)
+x=mect1@assays$RNA$scale.data
+diss <- Rfast::Dist(as.matrix(x))
+
+k.max=100
+v <- rep(0, k.max)
+for (i in 1:k.max) {
+  clust <- kmeans(x, i)
+  v[i] <- factoextra:::.get_withinSS(diss, clust$cluster)
+  cat(i)
+}
+
+
+df <- data.frame(clusters = as.factor(1:k.max), y = v, 
+                 stringsAsFactors = TRUE)
+
+```
+
+```{r}
+ylab <- "Total Within Sum of Square"
+p <- ggpubr::ggline(df, x = "clusters", y = "y", group = 1, 
+                    color = "steelblue", ylab = ylab, xlab = "Number of clusters k", 
+                    main = "Ectoderm: Optimal number of clusters")
+
+saveRDS(p,"human_face_mouse_ect_ElbowPlot_data_27Mar.rds")
+p <- readRDS("human_face_mouse_ect_ElbowPlot_data_27Mar.rds")
+p + scale_x_discrete(breaks = seq(0, max(as.numeric(as.character(p$data$clusters))), by = 5))+
+  geom_vline(xintercept = elbow_point(as.numeric(p$data$clusters),as.numeric(p$data$y))$x, linetype=2)
+
+elbow_point(as.numeric(p$data$clusters),as.numeric(p$data$y))
+# x= 16 clusters
+
+apply(mect1@meta.data[,grep("RNA_snn_res",colnames(mect1@meta.data))],2,function(x) length(unique(x)))
+# choosing resolution=0.8 (20 clusters)
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Ectoderm_Subclustering_OptimalClusters_ElbowPlot.pdf",width=11,height=8.5)
+p + scale_x_discrete(breaks = seq(0, max(as.numeric(as.character(p$data$clusters))), by = 5))+
+  geom_vline(xintercept = elbow_point(as.numeric(p$data$clusters),as.numeric(p$data$y))$x, linetype=2)
+dev.off()
+```
+
+```{r}
+p1 <- DimPlot(mect,group.by="RNA_snn_res.0.6",label=T)
+p2 <- DimPlot(mect,group.by="RNA_snn_res.0.8",label=T)
+p3 <- DimPlot(mect,group.by="annotation",label=T)
+
+p1
+p2
+p3
+```
+```{r}
+p <- clustree(mect1, prefix = "RNA_snn_res.")
+p
+```
+
+de novo mutation gene analysis from Fig 8
+```{r}
+DN_genes <- openxlsx::read.xlsx("/mnt/isilon/cotney_lab_hpc/manchela/Craniofacial-scRNAseqManuscript/20250605_geneintersection_and_enrichment.xlsx",sheet = 4)
+
+DN_genes_palatesurface3 <- as.vector(strsplit2(DN_genes[which(DN_genes[,1]=="palate.surface.3"),2],split=", "))
+
+Idents(ect) <- ect$subtype_final
+p <- Clustered_DotPlot(seurat_object = ect, features = DN_genes_palatesurface3,show_ident_colors = F,row_label_size = 10,column_label_size = 10)
+p
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Human_ect_subtypes_DNgenes.pdf",height=7,width=9)
+p
+dev.off()
+```
+
+```{r}
+palatesurface3_denovo_entrez <- ect_annotLookup$entrezgene_id[match(as.character(DN_genes_palatesurface3),ect_annotLookup$hgnc_symbol)]
+palatesurface3_denovo_go <- enrichGO(palatesurface3_denovo_entrez,
+                          OrgDb    = org.Hs.eg.db,
+                          ont = "ALL",
+                          pAdjustMethod = "BH",
+                          readable = TRUE)
+palatesurface3_denovo_dgn <- enrichDGN(palatesurface3_denovo_entrez,
+                          pAdjustMethod = "BH",
+                          readable = TRUE)
+
+palatesurface3_denovo_dgn <- pairwise_termsim(palatesurface3_denovo_dgn)
+
+
+```
+
+```{r}
+human_ect_subtype_markers <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/SigGenes_ect_SubTypes_8Apr.xlsx")
+human_palatesurface3 <- subset(human_ect_subtype_markers, cluster == "palate.surface.3")
+foldChange <- human_palatesurface3$avg_log2FC
+names(foldChange) <- human_palatesurface3$Entrez
+
+p1 <- dotplot(palatesurface3_denovo_go, showCategory=30) + ggtitle("CLP Trio De Novo palate.surface.3 Markers")
+p2 <- cnetplot(palatesurface3_denovo_go, categorySize="pvalue", foldChange = foldChange)
+p3 <- cnetplot(palatesurface3_denovo_go, categorySize="pvalue", foldChange = foldChange, circular = TRUE, colorEdge = TRUE)
+p4 <- heatplot(palatesurface3_denovo_go, foldChange=foldChange, showCategory=25)
+p5 <- heatplot(palatesurface3_denovo_dgn, showCategory=25, foldChange=foldChange) + viridis::scale_fill_viridis() + theme(axis.text.x = element_text(face = "italic", size = 12),
+axis.text = element_text(color="black"))
+
+p1
+p2
+p3
+p4
+p5
+
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Human_ect_palatesurface3_denovo_dgn_heatplot.pdf", h = 6, w = 8)
+p5
+dev.off()
+```
+

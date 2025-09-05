@@ -1,0 +1,933 @@
+---
+title: "Spatial_Expression"
+output: html_document
+date: "2025-04-07"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "/scr1/users/manchela/Data") 
+library(Seurat)
+library(SeuratDisk)
+library(tidyverse)
+library(harmony)
+library(dplyr)
+library(patchwork)
+library(viridis)
+library(ggforce)
+library(gghalves)
+library(ggridges)
+library(scCustomize)
+library(SCpubr)
+library(dplyr)
+library(DropletUtils)
+library(biomaRt)
+library(limma)
+library(pheatmap)
+library(grid)
+library(openxlsx)
+library(clusterProfiler)
+library(enrichplot)
+library(org.Hs.eg.db)
+library(AnnotationHub)
+library(ReactomePA)
+library(DOSE)
+library(orthogene)
+library(factoextra)
+library(smerc)
+library(Rfast)
+library(GeneOverlap)
+library(reshape2)
+library(ggvenn)
+```
+
+load in human scRNAseq data
+load in human CS13 spatial data (Xu et al. 2023)
+```{r}
+cds <- readRDS("human_face_no-neuro_clustering_cellrangerARC-raw_emptyDrops_singlets_finalannot_27Mar.rds")
+
+spatial <- readRDS("emb.merge.rds")
+SpatialDimPlot(spatial,images = "image1")
+SpatialDimPlot(spatial,images = "image2")
+
+```
+Plot relevant annotations
+```{r}
+p1 <- SpatialDimPlot(spatial, label = FALSE,pt.size.factor = 0) + NoLegend()
+p2 <- DimPlot(spatial,group.by="SCT_snn_res.0.8",label=T)
+p3 <- DimPlot(spatial, group.by = "orig.ident", label = TRUE)
+p4<- DimPlot(spatial, group.by = "ident", split.by = 'orig.ident')
+p5 <- DimPlot(spatial, reduction = "umap", label = TRUE)
+p6 <- SpatialDimPlot(spatial, label = TRUE, label.size = 3,  image.alpha = 0.3,repel = T) + NoLegend()
+p7 <- SpatialDimPlot(spatial, label = FALSE, label.size = 3,  image.alpha = 0.3)
+p8 <- VlnPlot(spatial, features = "nCount_Spatial", pt.size = 0.1) + NoLegend()
+p9 <- SpatialFeaturePlot(spatial, features = "nCount_Spatial", image.alpha = 0.3) + theme(legend.position = "right")
+
+p1
+p2
+p3
+p4
+p5
+p6
+p7
+p8
+p9
+
+```
+
+```{r}
+pdf(file = "Craniofacial-scRNAseqManuscript/final-figs/human_spatial_qc_plots.pdf",height=8.5, width=11)
+p1
+p2
+p3
+p4
+p5
+p6
+p7
+p8
+p9
+dev.off()
+```
+
+
+```{r}
+mart <-  useMart("ENSEMBL_MART_ENSEMBL") #, host = "https://useast.ensembl.org")
+mart <- useDataset("hsapiens_gene_ensembl", mart)
+annotLookup <- getBM(
+  mart = mart,
+  attributes = c(
+    "hgnc_symbol","description",
+    "entrezgene_id",
+    "gene_biotype"),
+  filter = "hgnc_symbol",
+  values = rownames(cds),
+  uniqueRows=TRUE)
+```
+
+load of marker genes
+```{r}
+human_main_markers <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/SigGenes_No-Neuro_Main_Celltypes.xlsx")
+# human_subtype_markers <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/")
+human_mes_subtype_markers <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/SigGenes_mes_SubTypes_8Apr.xlsx")
+human_sox10pos_subtype_markers <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/SigGenes_cncc_Subtypes_27Mar.xlsx")
+human_ect_subtype_markers <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/SigGenes_ect_SubTypes_8Apr.xlsx")
+human_sox2pos_subtype_markers <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/SigGenes_prog_subtype_final.xlsx")
+
+```
+
+subset top marker genes for each celltype
+```{r}
+
+human_main_markers <- subset(human_main_markers, biotype == "protein_coding")
+top <- human_main_markers %>% filter(p_val_adj <0.05) %>% group_by(cluster) %>% top_n(10, avg_log2FC)
+top100 <- human_main_markers%>% filter(p_val_adj <0.05) %>%   group_by(cluster) %>% top_n(100, avg_log2FC)
+top100pval <- subset(top100, rowSums(top100[5] < 0.05) > 0)
+
+human_mesenchyme <- subset(top100pval, cluster == "mesenchyme")
+human_sox10pos <- subset(top100pval, cluster == "SOX2-_SOX10+")
+human_ectoderm <- subset(top100pval, cluster == "ectoderm")
+human_muscle <- subset(top100pval, cluster == "muscle")
+human_endothelium <- subset(top100pval, cluster == "endothelium")
+human_eryth <- subset(top100pval, cluster == "erythrocytes")
+human_immune <- subset(top100pval, cluster == "immune")
+human_sox2pos<- subset(top100pval, cluster == "SOX2+_SOX10-")
+
+```
+
+
+add module scores for each main cell type
+```{r}
+spatial <- AddModuleScore(spatial, list(human_sox10pos$gene), name = "SOX2-_SOX10+_ModuleScore")
+spatial <- AddModuleScore(spatial, list(human_ectoderm$gene), name = "Ectoderm_ModuleScore")
+spatial <- AddModuleScore(spatial, list(human_endothelium$gene), name = "Endothelium_ModuleScore")
+spatial <- AddModuleScore(spatial, list(human_muscle$gene), name = "Muscle_ModuleScore")
+spatial <- AddModuleScore(spatial, list(human_mesenchyme$gene), name = "Mesenchyme_ModuleScore")
+spatial <- AddModuleScore(spatial, list(human_eryth$gene), name = "Erythrocytes_ModuleScore")
+spatial <- AddModuleScore(spatial, list(human_immune$gene), name = "Immune_ModuleScore")
+spatial <- AddModuleScore(spatial, list(human_sox2pos$gene), name = "SOX2+_SOX10-_ModuleScore")
+
+
+p1_1 <- SpatialFeaturePlot(spatial, features = "Mesenchyme_ModuleScore1", image.alpha = 0.3,images = "image1") + ggtitle("Image1") +
+  theme(legend.position = "right",plot.title = element_text(hjust = 0.5,size=14))
+p1_2 <- SpatialFeaturePlot(spatial, features = "Mesenchyme_ModuleScore1", image.alpha = 0.3,images = "image2") + ggtitle("Image2") +
+  theme(legend.position = "right",plot.title = element_text(hjust = 0.5,size=14))
+
+p2_1 <- SpatialFeaturePlot(spatial, features = "SOX2-_SOX10+_ModuleScore1", image.alpha = 0.3,images = "image1") + ggtitle("Image1") +
+  theme(legend.position = "right",plot.title = element_text(hjust = 0.5,size=14))
+p2_2 <- SpatialFeaturePlot(spatial, features = "SOX2-_SOX10+_ModuleScore1", image.alpha = 0.3,images = "image2") + ggtitle("Image2") +
+  theme(legend.position = "right",plot.title = element_text(hjust = 0.5,size=14))
+
+p3_1 <- SpatialFeaturePlot(spatial, features = "Ectoderm_ModuleScore1", image.alpha = 0.3,images = "image1") + ggtitle("Image1") +
+  theme(legend.position = "right",plot.title = element_text(hjust = 0.5,size=14))
+p3_2 <- SpatialFeaturePlot(spatial, features = "Ectoderm_ModuleScore1", image.alpha = 0.3,images = "image2") + ggtitle("Image2") +
+  theme(legend.position = "right",plot.title = element_text(hjust = 0.5,size=14))
+
+p4_1 <- SpatialFeaturePlot(spatial, features = "Muscle_ModuleScore1", image.alpha = 0.3,images = "image1") + ggtitle("Image1") +
+  theme(legend.position = "right",plot.title = element_text(hjust = 0.5,size=14))
+p4_2 <- SpatialFeaturePlot(spatial, features = "Muscle_ModuleScore1", image.alpha = 0.3,images = "image2") + ggtitle("Image2") +
+  theme(legend.position = "right",plot.title = element_text(hjust = 0.5,size=14))
+
+p5_1 <- SpatialFeaturePlot(spatial, features = "Endothelium_ModuleScore1", image.alpha = 0.3,images = "image1") + ggtitle("Image1") +
+  theme(legend.position = "right",plot.title = element_text(hjust = 0.5,size=14))
+p5_2 <- SpatialFeaturePlot(spatial, features = "Endothelium_ModuleScore1", image.alpha = 0.3,images = "image2") + ggtitle("Image2") +
+  theme(legend.position = "right",plot.title = element_text(hjust = 0.5,size=14))
+
+p6_1 <- SpatialFeaturePlot(spatial, features = "Erythrocytes_ModuleScore1", image.alpha = 0.3,images = "image1") + ggtitle("Image1") +
+  theme(legend.position = "right",plot.title = element_text(hjust = 0.5,size=14))
+p6_2 <- SpatialFeaturePlot(spatial, features = "Erythrocytes_ModuleScore1", image.alpha = 0.3,images = "image2") + ggtitle("Image2") +
+  theme(legend.position = "right",plot.title = element_text(hjust = 0.5,size=14))
+
+p7_1 <- SpatialFeaturePlot(spatial, features = "Immune_ModuleScore1", image.alpha = 0.3,images = "image1") + ggtitle("Image1") +
+  theme(legend.position = "right",plot.title = element_text(hjust = 0.5,size=14))
+p7_2 <- SpatialFeaturePlot(spatial, features = "Immune_ModuleScore1", image.alpha = 0.3,images = "image2") + ggtitle("Image2") +
+  theme(legend.position = "right",plot.title = element_text(hjust = 0.5,size=14))
+
+p8_1 <- SpatialFeaturePlot(spatial, features = "SOX2+_SOX10-_ModuleScore1", image.alpha = 0.3,images = "image1") + ggtitle("Image1") +
+  theme(legend.position = "right",plot.title = element_text(hjust = 0.5,size=14))
+p8_2 <- SpatialFeaturePlot(spatial, features = "SOX2+_SOX10-_ModuleScore1", image.alpha = 0.3,images = "image2") + ggtitle("Image2") +
+  theme(legend.position = "right",plot.title = element_text(hjust = 0.5,size=14))
+
+p1_1+p1_2
+p2_1+p2_2
+p3_1+p3_2
+p4_1+p4_2
+p5_1+p5_2
+p6_1+p6_2
+p7_1+p7_2
+p8_1+p8_2
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/SpatialExpression_MainCellTypes_ModuleScores_SpatialFeaturePlots.pdf", h = 8.5, w = 16)
+p1_1+p1_2
+p2_1+p2_2
+p3_1+p3_2
+p4_1+p4_2
+p5_1+p5_2
+p6_1+p6_2
+p7_1+p7_2
+p8_1+p8_2
+dev.off()
+```
+
+get top subtype marker genes
+```{r}
+human_mes_subtype_markers$biotype <- annotLookup$gene_biotype[match(human_mes_subtype_markers$gene,annotLookup$hgnc_symbol)]
+human_mes_subtype_markers <- subset(human_mes_subtype_markers, biotype == "protein_coding")
+top100_mes <- human_mes_subtype_markers %>% filter(p_val_adj<0.05) %>% group_by(cluster) %>% arrange(desc(avg_log2FC)) %>% top_n(100, avg_log2FC)
+top100pval_mes <- subset(top100_mes, rowSums(top100_mes[5] < 0.05) > 0)
+
+human_ect_subtype_markers$biotype <- annotLookup$gene_biotype[match(human_ect_subtype_markers$gene,annotLookup$hgnc_symbol)]
+human_ect_subtype_markers <- subset(human_ect_subtype_markers, biotype == "protein_coding")
+top100_ect <- human_ect_subtype_markers %>% filter(p_val_adj<0.05) %>% group_by(cluster) %>% arrange(desc(avg_log2FC)) %>% top_n(100, avg_log2FC)
+top100pval_ect <- subset(top100_ect, rowSums(top100_ect[5] < 0.05) > 0)
+
+human_sox10pos_subtype_markers$biotype <- annotLookup$gene_biotype[match(human_sox10pos_subtype_markers$gene,annotLookup$hgnc_symbol)]
+human_sox10pos_subtype_markers <- subset(human_sox10pos_subtype_markers, biotype == "protein_coding")
+top100_sox10pos <- human_sox10pos_subtype_markers %>% filter(p_val_adj<0.05) %>% group_by(cluster) %>% arrange(desc(avg_log2FC)) %>% top_n(100, avg_log2FC)
+top100pval_sox10pos <- subset(top100_sox10pos, rowSums(top100_sox10pos[5] < 0.05) > 0)
+
+human_sox2pos_subtype_markers$biotype <- annotLookup$gene_biotype[match(human_sox2pos_subtype_markers$gene,annotLookup$hgnc_symbol)]
+human_sox2pos_subtype_markers <- subset(human_sox2pos_subtype_markers, biotype == "protein_coding")
+top100_sox2pos <- human_sox2pos_subtype_markers %>% filter(p_val_adj<0.05) %>% group_by(cluster) %>% arrange(desc(avg_log2FC)) %>% top_n(100, avg_log2FC)
+top100pval_sox2pos <- subset(top100_sox2pos, rowSums(top100_sox2pos[5] < 0.05) > 0)
+
+
+```
+
+## PUTATIVE CNCC ##
+
+CNCC top marker genes
+```{r}
+sox10pos_subtype_genelists <- split(top100pval_sox10pos$gene,top100pval_sox10pos$cluster)
+
+```
+
+CNCC subtype markers- top 10 TF's
+```{r}
+subtype_tf <- top100pval_sox10pos[which(top100pval_sox10pos$TF=="Yes"),]
+subtype_tf <- subtype_tf[-which(subtype_tf$gene%in%names(which(table(subtype_tf$gene)>1))),]
+subtype_tf_list <-  split(subtype_tf$gene,subtype_tf$cluster)
+```
+
+plot CNCC top TF marker genes
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/SpatialExpression_CNCC_subtype_TF-Markers_SpatialFeaturePlots_all.pdf",width=11,height=8.5)
+
+for (n in names(subtype_tf_list)) {
+  subtype_genes <- subtype_tf_list[[n]]
+  subtype_genes <- subtype_genes[which(subtype_genes%in%rownames(spatial))]
+  for (gene in subtype_genes){
+    p1 <- SpatialFeaturePlot(spatial, features = gene,,image.alpha=0.3,images = "image1")+ ggtitle("Image1") +
+    theme(legend.position = "right",plot.title = element_text(hjust = 0.5,size=14))
+    
+    p2 <- SpatialFeaturePlot(spatial, features = gene,image.alpha=0.3,images = "image2")+ ggtitle("Image2") +
+    theme(legend.position = "right",plot.title = element_text(hjust = 0.5,size=14))
+    
+    combined_plot <- (p1 | p2) + 
+    plot_annotation(title = paste0(n, " subtype marker"), 
+                  theme = theme(plot.title = element_text(hjust = 0.5, size = 14)))
+    print(combined_plot)
+  }
+}
+dev.off()
+```
+
+
+CNCC subtype specific markers
+```{r}
+plot.list <- list()
+for (gene in c("NR2F1","TWIST1","ALX4","HAND2")){
+  p1_1 <- SpatialFeaturePlot(spatial, features = gene,image.alpha=0.3,images = "image1") + ggtitle("Slice1") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5)) 
+
+  p2_1 <- SpatialFeaturePlot(spatial, features = gene,image.alpha=0.3,images = "image2") + ggtitle("Slice2") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5))
+ 
+   plot.list[[gene]] <- list(p1_1,p2_1)
+}
+
+for (i in names(plot.list)){
+  print(plot.list[[i]][[1]]+plot.list[[i]][[2]])
+}
+```
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/SpatialExpression_CNCC_subtypeSpecificMarkers_SpatialFeaturePlots.pdf",width=9,height=6)
+cowplot::plot_grid(plot.list[[1]][[1]],plot.list[[1]][[2]],NULL,
+                   plot.list[[2]][[1]],plot.list[[2]][[2]],
+                   plot.list[[3]][[1]],plot.list[[3]][[2]],NULL,
+                   plot.list[[4]][[1]],plot.list[[4]][[2]],
+                   ncol=5,nrow = 2,rel_widths = c(1, 1, 0.2, 1, 1))
+dev.off()
+```
+
+General CNCC markers
+```{r}
+plot.list <- list()
+for (gene in c("NR2F1","PAX3","TFAP2A","TFAP2B")){
+  p1_1 <- SpatialFeaturePlot(spatial, features = gene,image.alpha=0.3,images = "image1") + ggtitle("Slice1") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5)) 
+
+  p2_1 <- SpatialFeaturePlot(spatial, features = gene,image.alpha=0.3,images = "image2") + ggtitle("Slice2") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5))
+ 
+   plot.list[[gene]] <- list(p1_1,p2_1)
+}
+
+for (i in names(plot.list)){
+  print(plot.list[[i]][[1]]+plot.list[[i]][[2]])
+}
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/SpatialExpression_CNCC_generalCNCCmarkers_SpatialFeaturePlots.pdf",width=9,height=6)
+cowplot::plot_grid(plot.list[[1]][[1]],plot.list[[1]][[2]],NULL,
+                   plot.list[[2]][[1]],plot.list[[2]][[2]],
+                   plot.list[[3]][[1]],plot.list[[3]][[2]],NULL,
+                   plot.list[[4]][[1]],plot.list[[4]][[2]],
+                   ncol=5,nrow = 2,rel_widths = c(1, 1, 0.2, 1, 1))
+dev.off()
+```
+
+CNCC subtype module scores
+```{r}
+
+for (n in names(sox10pos_subtype_genelists)){
+  spatial <- AddModuleScore(spatial, list(sox10pos_subtype_genelists[[n]]), name = n)
+  spatial[[n]] <- spatial[[paste0(n,"1")]]
+}
+
+plot.list <- list()
+for (subtype in names(sox10pos_subtype_genelists)){
+  p1_1 <- SpatialFeaturePlot(spatial, features = subtype,image.alpha=0.3,images = "image1") + ggtitle("Slice1") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5)) 
+
+  p2_1 <- SpatialFeaturePlot(spatial, features = subtype,image.alpha=0.3,images = "image2") + ggtitle("Slice2") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5))
+ 
+   plot.list[[subtype]] <- list(p1_1,p2_1)
+}
+```
+```{r}
+for (i in names(plot.list)){
+  print(plot.list[[i]][[1]]+plot.list[[i]][[2]])
+}
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/SpatialExpression_CNCC_Subtypes_ModuleScores_SpatialFeaturePlots.pdf",width=26,height=18)
+cowplot::plot_grid(plot.list[[1]][[1]],plot.list[[1]][[2]],NULL,
+                   plot.list[[2]][[1]],plot.list[[2]][[2]],NULL,
+                   plot.list[[3]][[1]],plot.list[[3]][[2]],NULL,
+                   plot.list[[4]][[1]],plot.list[[4]][[2]],
+                   plot.list[[5]][[1]],plot.list[[5]][[2]],NULL,
+                   plot.list[[6]][[1]],plot.list[[6]][[2]],NULL,
+                   plot.list[[7]][[1]],plot.list[[7]][[2]],NULL,
+                   plot.list[[8]][[1]],plot.list[[8]][[2]],
+                   plot.list[[9]][[1]],plot.list[[9]][[2]],NULL,
+                   plot.list[[10]][[1]],plot.list[[10]][[2]],NULL,
+                   plot.list[[11]][[1]],plot.list[[11]][[2]],NULL,
+                   plot.list[[12]][[1]],plot.list[[12]][[2]],
+                   plot.list[[13]][[1]],plot.list[[13]][[2]],NULL,
+                   plot.list[[14]][[1]],plot.list[[14]][[2]],NULL,
+                   plot.list[[15]][[1]],plot.list[[15]][[2]],NULL,
+                   plot.list[[16]][[1]],plot.list[[16]][[2]],
+                   plot.list[[17]][[1]],plot.list[[17]][[2]],NULL,
+                   plot.list[[18]][[1]],plot.list[[18]][[2]],NULL,
+                   plot.list[[19]][[1]],plot.list[[19]][[2]],
+                   ncol=11,nrow = 5,rel_widths = c(1, 1, 0.2, 1, 1, 0.2, 1, 1, 0.2, 1, 1) )
+dev.off()
+```
+
+## ECTODERM ##
+
+General Ectoderm Markers
+```{r}
+plot.list <- list()
+for (gene in c("TFAP2A","GRHL2","ESRP1","KLF5")) {
+  p1_1 <- SpatialFeaturePlot(spatial, features = gene,image.alpha=0.3,images = "image1") + ggtitle("Slice1") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5)) 
+
+  p2_1 <- SpatialFeaturePlot(spatial, features = gene,image.alpha=0.3,images = "image2") + ggtitle("Slice2") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5))
+ 
+   plot.list[[gene]] <- list(p1_1,p2_1)
+}
+
+for (i in names(plot.list)){
+  print(plot.list[[i]][[1]]+plot.list[[i]][[2]])
+}
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/SpatialExpression_Ect_generalEctMarkers_SpatialFeaturePlots.pdf",width=9,height=6)
+cowplot::plot_grid(plot.list[[1]][[1]],plot.list[[1]][[2]],NULL,
+                   plot.list[[2]][[1]],plot.list[[2]][[2]],
+                   plot.list[[3]][[1]],plot.list[[3]][[2]],NULL,
+                   plot.list[[4]][[1]],plot.list[[4]][[2]],
+                   ncol=5,nrow = 2,rel_widths = c(1, 1, 0.2, 1, 1))
+dev.off()
+```
+
+top ect marker genes
+```{r}
+ect_subtype_genelists <- split(top100pval_ect$gene,top100pval_ect$cluster)
+```
+
+ect subtype module scores
+```{r}
+
+for (n in names(ect_subtype_genelists)){
+  spatial <- AddModuleScore(spatial, list(ect_subtype_genelists[[n]]), name = n)
+  spatial[[n]] <- spatial[[paste0(n,"1")]]
+}
+
+plot.list <- list()
+for (subtype in names(ect_subtype_genelists)){
+  p1_1 <- SpatialFeaturePlot(spatial, features = subtype,image.alpha=0.3,images = "image1") + ggtitle("Slice1") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5)) 
+
+  p2_1 <- SpatialFeaturePlot(spatial, features = subtype,image.alpha=0.3,images = "image2") + ggtitle("Slice2") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5))
+ 
+   plot.list[[subtype]] <- list(p1_1,p2_1)
+}
+```
+
+```{r}
+for (i in names(plot.list)){
+  print(plot.list[[i]][[1]]+plot.list[[i]][[2]])
+}
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/SpatialExpression_Ect_Subtypes_ModuleScores_SpatialFeaturePlots.pdf",width=26,height=20)
+cowplot::plot_grid(plot.list[[1]][[1]],plot.list[[1]][[2]],NULL,
+                   plot.list[[2]][[1]],plot.list[[2]][[2]],NULL,
+                   plot.list[[3]][[1]],plot.list[[3]][[2]],NULL,
+                   plot.list[[4]][[1]],plot.list[[4]][[2]],
+                   plot.list[[5]][[1]],plot.list[[5]][[2]],NULL,
+                   plot.list[[6]][[1]],plot.list[[6]][[2]],NULL,
+                   plot.list[[7]][[1]],plot.list[[7]][[2]],NULL,
+                   plot.list[[8]][[1]],plot.list[[8]][[2]],
+                   plot.list[[9]][[1]],plot.list[[9]][[2]],NULL,
+                   plot.list[[10]][[1]],plot.list[[10]][[2]],NULL,
+                   plot.list[[11]][[1]],plot.list[[11]][[2]],NULL,
+                   plot.list[[12]][[1]],plot.list[[12]][[2]],
+                   plot.list[[13]][[1]],plot.list[[13]][[2]],NULL,
+                   plot.list[[14]][[1]],plot.list[[14]][[2]],NULL,
+                   plot.list[[15]][[1]],plot.list[[15]][[2]],NULL,
+                   plot.list[[16]][[1]],plot.list[[16]][[2]],
+                   plot.list[[17]][[1]],plot.list[[17]][[2]],NULL,
+                   plot.list[[18]][[1]],plot.list[[18]][[2]],NULL,
+                   plot.list[[19]][[1]],plot.list[[19]][[2]],NULL,
+                   plot.list[[20]][[1]],plot.list[[20]][[2]],
+                   plot.list[[21]][[1]],plot.list[[21]][[2]],NULL,
+                   plot.list[[22]][[1]],plot.list[[22]][[2]],
+                   ncol=11,nrow = 6,rel_widths = c(1, 1, 0.2, 1, 1, 0.2, 1, 1, 0.2, 1, 1))
+dev.off()
+```
+
+
+Ectoderm subtype markers- top 10 TF's
+```{r}
+subtype_tf <- top100pval_ect[which(top100pval_ect$TF=="Yes"),]
+subtype_tf <- subtype_tf[-which(subtype_tf$gene%in%names(which(table(subtype_tf$gene)>1))),]
+subtype_tf_list <-  split(subtype_tf$gene,subtype_tf$cluster)
+```
+
+plot top ect TF marker genes 
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/SpatialExpression_Ect_subtype_TF-Markers_SpatialFeaturePlots_all.pdf",width=11,height=8.5)
+
+for (n in names(subtype_tf_list)) {
+  subtype_genes <- subtype_tf_list[[n]]
+  subtype_genes <- subtype_genes[which(subtype_genes%in%rownames(spatial))]
+  for (gene in subtype_genes){
+    p1 <- SpatialFeaturePlot(spatial, features = gene,,image.alpha=0.3,images = "image1")+ ggtitle("Image1") +
+    theme(legend.position = "right",plot.title = element_text(hjust = 0.5,size=14))
+    
+    p2 <- SpatialFeaturePlot(spatial, features = gene,image.alpha=0.3,images = "image2")+ ggtitle("Image2") +
+    theme(legend.position = "right",plot.title = element_text(hjust = 0.5,size=14))
+    
+    combined_plot <- (p1 | p2) + 
+    plot_annotation(title = paste0(n, " subtype marker"), 
+                  theme = theme(plot.title = element_text(hjust = 0.5, size = 14)))
+    print(combined_plot)
+  }
+}
+dev.off()
+```
+
+Ectoderm subtype specific markers
+```{r}
+plot.list <- list()
+for (gene in c("SIX2","NR2E1","SIX6", "NKX2-1")){
+  p1_1 <- SpatialFeaturePlot(spatial, features = gene,image.alpha=0.3,images = "image1") + ggtitle("Slice1") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5)) 
+
+  p2_1 <- SpatialFeaturePlot(spatial, features = gene,image.alpha=0.3,images = "image2") + ggtitle("Slice2") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5))
+ 
+   plot.list[[gene]] <- list(p1_1,p2_1)
+}
+
+for (i in names(plot.list)){
+  print(plot.list[[i]][[1]]+plot.list[[i]][[2]])
+}
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/SpatialExpression_Ect_subtypeSpecificMarkers_SpatialFeaturePlots.pdf",width=9,height=6)
+cowplot::plot_grid(plot.list[[1]][[1]],plot.list[[1]][[2]],NULL,
+                   plot.list[[2]][[1]],plot.list[[2]][[2]],
+                   plot.list[[3]][[1]],plot.list[[3]][[2]],NULL,
+                   plot.list[[4]][[1]],plot.list[[4]][[2]],
+                   ncol=5,nrow = 2,rel_widths = c(1, 1, 0.2, 1, 1))
+dev.off()
+```
+
+
+## MESENCHYME ##
+
+General mes markers
+```{r}
+plot.list <- list()
+for (gene in c("SATB2","TWIST1","PRRX1", "FOXF1")) {
+  p1_1 <- SpatialFeaturePlot(spatial, features = gene,image.alpha=0.3,images = "image1") + ggtitle("Slice1") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5)) 
+
+  p2_1 <- SpatialFeaturePlot(spatial, features = gene,image.alpha=0.3,images = "image2") + ggtitle("Slice2") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5))
+ 
+   plot.list[[gene]] <- list(p1_1,p2_1)
+}
+
+for (i in names(plot.list)){
+  print(plot.list[[i]][[1]]+plot.list[[i]][[2]])
+}
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/SpatialExpression_Mes_generalMesmarkers_SpatialFeaturePlots.pdf",width=9,height=6)
+cowplot::plot_grid(plot.list[[1]][[1]],plot.list[[1]][[2]],NULL,
+                   plot.list[[2]][[1]],plot.list[[2]][[2]],
+                   plot.list[[3]][[1]],plot.list[[3]][[2]],NULL,
+                   plot.list[[4]][[1]],plot.list[[4]][[2]],
+                   ncol=5,nrow = 2,rel_widths = c(1, 1, 0.2, 1, 1))
+dev.off()
+```
+
+```{r}
+mes_subtype_genelists <- split(top100pval_mes$gene,top100pval_mes$cluster)
+
+```
+
+
+Mesenchyme subtype module scores
+```{r}
+
+for (n in names(mes_subtype_genelists)){
+  spatial <- AddModuleScore(spatial, list(mes_subtype_genelists[[n]]), name = n)
+  spatial[[n]] <- spatial[[paste0(n,"1")]]
+}
+
+plot.list <- list()
+for (subtype in names(mes_subtype_genelists)){
+  p1_1 <- SpatialFeaturePlot(spatial, features = subtype,image.alpha=0.3,images = "image1") + ggtitle("Slice1") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5)) 
+
+  p2_1 <- SpatialFeaturePlot(spatial, features = subtype,image.alpha=0.3,images = "image2") + ggtitle("Slice2") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5))
+ 
+   plot.list[[subtype]] <- list(p1_1,p2_1)
+}
+```
+
+```{r}
+for (i in names(plot.list)){
+  print(plot.list[[i]][[1]]+plot.list[[i]][[2]])
+}
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/SpatialExpression_Mes_Subtypes_ModuleScores_SpatialFeaturePlots.pdf",width=26,height=24)
+cowplot::plot_grid(plot.list[[1]][[1]],plot.list[[1]][[2]],NULL,
+                   plot.list[[2]][[1]],plot.list[[2]][[2]],NULL,
+                   plot.list[[3]][[1]],plot.list[[3]][[2]],NULL,
+                   plot.list[[4]][[1]],plot.list[[4]][[2]],
+                   plot.list[[5]][[1]],plot.list[[5]][[2]],NULL,
+                   plot.list[[6]][[1]],plot.list[[6]][[2]],NULL,
+                   plot.list[[7]][[1]],plot.list[[7]][[2]],NULL,
+                   plot.list[[8]][[1]],plot.list[[8]][[2]],
+                   plot.list[[9]][[1]],plot.list[[9]][[2]],NULL,
+                   plot.list[[10]][[1]],plot.list[[10]][[2]],NULL,
+                   plot.list[[11]][[1]],plot.list[[11]][[2]],NULL,
+                   plot.list[[12]][[1]],plot.list[[12]][[2]],
+                   plot.list[[13]][[1]],plot.list[[13]][[2]],NULL,
+                   plot.list[[14]][[1]],plot.list[[14]][[2]],NULL,
+                   plot.list[[15]][[1]],plot.list[[15]][[2]],NULL,
+                   plot.list[[16]][[1]],plot.list[[16]][[2]],
+                   plot.list[[17]][[1]],plot.list[[17]][[2]],NULL,
+                   plot.list[[18]][[1]],plot.list[[18]][[2]],NULL,
+                   plot.list[[19]][[1]],plot.list[[19]][[2]],NULL,
+                   plot.list[[20]][[1]],plot.list[[20]][[2]],
+                   plot.list[[21]][[1]],plot.list[[21]][[2]],NULL,
+                   plot.list[[22]][[1]],plot.list[[22]][[2]],NULL,
+                   plot.list[[23]][[1]],plot.list[[23]][[2]],NULL,
+                   plot.list[[24]][[1]],plot.list[[24]][[2]],
+                   plot.list[[25]][[1]],plot.list[[25]][[2]],
+                   ncol=11,nrow = 7,rel_widths = c(1, 1, 0.2, 1, 1, 0.2, 1, 1, 0.2, 1, 1) )
+dev.off()
+```
+
+Mesenchyme subtype markers- top 10 TF's
+```{r}
+subtype_tf <- top100pval_mes[which(top100pval_mes$TF=="Yes"),]
+subtype_tf <- subtype_tf[-which(subtype_tf$gene%in%names(which(table(subtype_tf$gene)>1))),]
+subtype_tf_list <-  split(subtype_tf$gene,subtype_tf$cluster)
+```
+
+plot top mes TF marker genes
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/SpatialExpression_Mes_subtype_TF-Markers_SpatialFeaturePlots_all.pdf",width=11,height=8.5)
+
+for (n in names(subtype_tf_list)) {
+  subtype_genes <- subtype_tf_list[[n]]
+  subtype_genes <- subtype_genes[which(subtype_genes%in%rownames(spatial))]
+  for (gene in subtype_genes){
+    p1 <- SpatialFeaturePlot(spatial, features = gene,,image.alpha=0.3,images = "image1")+ ggtitle("Image1") +
+    theme(legend.position = "right",plot.title = element_text(hjust = 0.5,size=14))
+    
+    p2 <- SpatialFeaturePlot(spatial, features = gene,image.alpha=0.3,images = "image2")+ ggtitle("Image2") +
+    theme(legend.position = "right",plot.title = element_text(hjust = 0.5,size=14))
+    
+    combined_plot <- (p1 | p2) + 
+    plot_annotation(title = paste0(n, " subtype marker"), 
+                  theme = theme(plot.title = element_text(hjust = 0.5, size = 14)))
+    print(combined_plot)
+  }
+}
+dev.off()
+```
+
+
+```{r}
+for (gene in names(which(table(subtype_tf$gene)>1))){
+    p1 <- SpatialFeaturePlot(spatial, features = gene,,image.alpha=0.3,images = "image1")+ ggtitle("Image1") +
+    theme(legend.position = "right",plot.title = element_text(hjust = 0.5,size=14))
+    
+    p2 <- SpatialFeaturePlot(spatial, features = gene,image.alpha=0.3,images = "image2")+ ggtitle("Image2") +
+    theme(legend.position = "right",plot.title = element_text(hjust = 0.5,size=14))
+    
+    combined_plot <- (p1 | p2) + 
+    plot_annotation(title = n, 
+                  theme = theme(plot.title = element_text(hjust = 0.5, size = 14)))
+    print(combined_plot)
+  }
+```
+
+
+Mesenchyme subtype specific markers
+```{r}
+plot.list <- list()
+for (gene in c("BARX1","DLX5","EMX2", "DMRTA2")){ #MSX1
+  p1_1 <- SpatialFeaturePlot(spatial, features = gene,image.alpha=0.3,images = "image1") + ggtitle("Slice1") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5)) 
+
+  p2_1 <- SpatialFeaturePlot(spatial, features = gene,image.alpha=0.3,images = "image2") + ggtitle("Slice2") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5))
+ 
+   plot.list[[gene]] <- list(p1_1,p2_1)
+}
+
+for (i in names(plot.list)){
+  print(plot.list[[i]][[1]]+plot.list[[i]][[2]])
+}
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/SpatialExpression_Mes_subtypeSpecificMarkers_SpatialFeaturePlots.pdf",width=9,height=6)
+cowplot::plot_grid(plot.list[[1]][[1]],plot.list[[1]][[2]],NULL,
+                   plot.list[[2]][[1]],plot.list[[2]][[2]],
+                   plot.list[[3]][[1]],plot.list[[3]][[2]],NULL,
+                   plot.list[[4]][[1]],plot.list[[4]][[2]],
+                   ncol=5,nrow = 2,rel_widths = c(1, 1, 0.2, 1, 1))
+dev.off()
+```
+
+## EARLY PROGENITORS ##
+
+```{r}
+sox2pos_subtype_genelists <- split(top100pval_sox2pos$gene,top100pval_sox2pos$cluster)
+
+```
+
+sox2+ subtype specific markers
+```{r}
+plot.list <- list()
+for (gene in c("FOXC1","FEZF2","DMRTA2","DMRT3")){
+  p1_1 <- SpatialFeaturePlot(spatial, features = gene,image.alpha=0.3,images = "image1") + ggtitle("Slice1") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5)) 
+
+  p2_1 <- SpatialFeaturePlot(spatial, features = gene,image.alpha=0.3,images = "image2") + ggtitle("Slice2") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5))
+ 
+   plot.list[[gene]] <- list(p1_1,p2_1)
+}
+
+for (i in names(plot.list)){
+  print(plot.list[[i]][[1]]+plot.list[[i]][[2]])
+}
+```
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/SpatialExpression_Prog_subtypeSpecificMarkers_SpatialFeaturePlots.pdf",width=9,height=6)
+cowplot::plot_grid(plot.list[[1]][[1]],plot.list[[1]][[2]],NULL,
+                   plot.list[[2]][[1]],plot.list[[2]][[2]],
+                   plot.list[[3]][[1]],plot.list[[3]][[2]],NULL,
+                   plot.list[[4]][[1]],plot.list[[4]][[2]],
+                   ncol=5,nrow = 2,rel_widths = c(1, 1, 0.2, 1, 1))
+dev.off()
+```
+
+General progenitor markers
+```{r}
+plot.list <- list()
+for (gene in c("SOX2","PAX6","POU3F2","FGFBP3")){
+  p1_1 <- SpatialFeaturePlot(spatial, features = gene,image.alpha=0.3,images = "image1") + ggtitle("Slice1") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5)) 
+
+  p2_1 <- SpatialFeaturePlot(spatial, features = gene,image.alpha=0.3,images = "image2") + ggtitle("Slice2") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5))
+ 
+   plot.list[[gene]] <- list(p1_1,p2_1)
+}
+
+for (i in names(plot.list)){
+  print(plot.list[[i]][[1]]+plot.list[[i]][[2]])
+}
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/SpatialExpression_Prog_generalProgmarkers_SpatialFeaturePlots.pdf",width=9,height=6)
+cowplot::plot_grid(plot.list[[1]][[1]],plot.list[[1]][[2]],NULL,
+                   plot.list[[2]][[1]],plot.list[[2]][[2]],
+                   plot.list[[3]][[1]],plot.list[[3]][[2]],NULL,
+                   plot.list[[4]][[1]],plot.list[[4]][[2]],
+                   ncol=5,nrow = 2,rel_widths = c(1, 1, 0.2, 1, 1))
+dev.off()
+```
+
+progenitor subtype module scores
+```{r}
+
+for (n in names(sox2pos_subtype_genelists)){
+  spatial <- AddModuleScore(spatial, list(sox2pos_subtype_genelists[[n]]), name = n)
+  spatial[[n]] <- spatial[[paste0(n,"1")]]
+}
+
+plot.list <- list()
+for (subtype in names(sox2pos_subtype_genelists)){
+  p1_1 <- SpatialFeaturePlot(spatial, features = subtype,image.alpha=0.3,images = "image1") + ggtitle("Slice1") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5)) 
+
+  p2_1 <- SpatialFeaturePlot(spatial, features = subtype,image.alpha=0.3,images = "image2") + ggtitle("Slice2") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5))
+ 
+   plot.list[[subtype]] <- list(p1_1,p2_1)
+}
+```
+```{r}
+for (i in names(plot.list)){
+  print(plot.list[[i]][[1]]+plot.list[[i]][[2]])
+}
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/SpatialExpression_Prog_Subtypes_ModuleScores_SpatialFeaturePlots.pdf",width=26,height=18)
+cowplot::plot_grid(plot.list[[1]][[1]],plot.list[[1]][[2]],NULL,
+                   plot.list[[2]][[1]],plot.list[[2]][[2]],NULL,
+                   plot.list[[3]][[1]],plot.list[[3]][[2]],NULL,
+                   plot.list[[4]][[1]],plot.list[[4]][[2]],
+                   plot.list[[5]][[1]],plot.list[[5]][[2]],NULL,
+                   plot.list[[6]][[1]],plot.list[[6]][[2]],NULL,
+                   plot.list[[7]][[1]],plot.list[[7]][[2]],NULL,
+                   plot.list[[8]][[1]],plot.list[[8]][[2]],
+                   plot.list[[9]][[1]],plot.list[[9]][[2]],NULL,
+                   plot.list[[10]][[1]],plot.list[[10]][[2]],NULL,
+                   plot.list[[11]][[1]],plot.list[[11]][[2]],NULL,
+                   plot.list[[12]][[1]],plot.list[[12]][[2]],
+                   plot.list[[13]][[1]],plot.list[[13]][[2]],NULL,
+                   plot.list[[14]][[1]],plot.list[[14]][[2]],NULL,
+                   plot.list[[15]][[1]],plot.list[[15]][[2]],NULL,
+                   plot.list[[16]][[1]],plot.list[[16]][[2]],
+                   plot.list[[17]][[1]],plot.list[[17]][[2]],NULL,
+                   plot.list[[18]][[1]],plot.list[[18]][[2]],NULL,
+                   plot.list[[19]][[1]],plot.list[[19]][[2]],NULL,
+                   plot.list[[20]][[1]],plot.list[[20]][[2]],
+                   ncol=11,nrow = 5,rel_widths = c(1, 1, 0.2, 1, 1, 0.2, 1, 1, 0.2, 1, 1) )
+dev.off()
+```
+
+
+
+```{r}
+# save updated spatial rds with module scores
+spatial@meta.data <- spatial@meta.data[,-na.omit(match(paste0(unique(cds$subtype),1),colnames(spatial@meta.data)))]
+saveRDS(spatial,"human_emb.merge_final.rds")
+
+```
+
+
+plot EBF genes on spatial data
+```{r}
+  p1 <- SpatialFeaturePlot(spatial, features = "EBF2",,image.alpha=0.3,images = "image1")+ ggtitle("Slice1") +
+  theme(legend.position = "bottom",plot.title = element_text(hjust = 0.5,size=14))
+  
+  p2 <- SpatialFeaturePlot(spatial, features = "EBF2",image.alpha=0.3,images = "image2")+ ggtitle("Slice2") +
+  theme(legend.position = "bottom",plot.title = element_text(hjust = 0.5,size=14))
+
+  p3 <- SpatialFeaturePlot(spatial, features = "EBF3",,image.alpha=0.3,images = "image1")+ ggtitle("Slice1") +
+  theme(legend.position = "bottom",plot.title = element_text(hjust = 0.5,size=14))
+  
+  p4 <- SpatialFeaturePlot(spatial, features = "EBF3",image.alpha=0.3,images = "image2")+ ggtitle("Slice2") +
+  theme(legend.position = "bottom",plot.title = element_text(hjust = 0.5,size=14))
+
+p1+p2
+p3+p4
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Human_EBF_SpatialExpression.pdf",width=8,height=3)
+cowplot::plot_grid(p1,p2,NULL,p3,p4,nrow=1,rel_widths = c(1, 1, 0.2, 1, 1))
+dev.off()
+```
+
+
+plot palate.surface.3 markers on spatial data
+```{r}
+palate.surface.3.allMarkers <- human_ect_subtype_markers[which(human_ect_subtype_markers$cluster=="palate.surface.3"&
+                                                                 human_ect_subtype_markers$p_val_adj<0.01 &
+                                                                 human_ect_subtype_markers$avg_log2FC > 1.5 &
+                                                                 human_ect_subtype_markers$pct.diff > 0.1),]
+
+spatial <- AddModuleScore(spatial, list(palate.surface.3.allMarkers$gene), name = "palate.surface.3.all")
+
+p1_1 <- SpatialFeaturePlot(spatial, features = "palate.surface.3.all1", image.alpha = 0.3,images = "image1") + ggtitle("Slice1") +
+  theme(legend.position = "bottom",plot.title = element_text(hjust = 0.5,size=14))
+p1_2 <- SpatialFeaturePlot(spatial, features = "palate.surface.3.all1", image.alpha = 0.3,images = "image2") + ggtitle("Slice2") +
+  theme(legend.position = "bottom",plot.title = element_text(hjust = 0.5,size=14))
+
+p1_1 + p1_2
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Human_palatesurface3.modScore.allsiggenes.pdf",width=6,height=4)
+p1_1 + p1_2
+dev.off()
+```
+
+
+plot Ect de novo CLP genes on spatial data
+```{r}
+plot.list <- list()
+for (gene in c("ESRP1", "GRHL1", "GRHL2" , "TPD52")){ 
+  p1_1 <- SpatialFeaturePlot(spatial, features = gene,image.alpha=0.3,images = "image1") + ggtitle("Slice1") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5)) 
+
+  p2_1 <- SpatialFeaturePlot(spatial, features = gene,image.alpha=0.3,images = "image2") + ggtitle("Slice2") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5))
+ 
+   plot.list[[gene]] <- list(p1_1,p2_1)
+}
+
+for (i in names(plot.list)){
+  print(plot.list[[i]][[1]]+plot.list[[i]][[2]])
+}
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/SpatialExpression_Ect_denovo-genes_CLP.pdf",width=9,height=6)
+cowplot::plot_grid(plot.list[[1]][[1]],plot.list[[1]][[2]],NULL,
+                   plot.list[[2]][[1]],plot.list[[2]][[2]],
+                   plot.list[[3]][[1]],plot.list[[3]][[2]],NULL,
+                   plot.list[[4]][[1]],plot.list[[4]][[2]],
+                   ncol=5,nrow = 2,rel_widths = c(1, 1, 0.2, 1, 1))
+dev.off()
+```
+
+plot Ect de novo CP genes on spatial data
+```{r}
+plot.list <- list()
+for (gene in c("CELSR1", "LLGL2", "NBEAL2", "NTN1", "RBM47")){ 
+  p1_1 <- SpatialFeaturePlot(spatial, features = gene,image.alpha=0.3,images = "image1") + ggtitle("Slice1") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5)) 
+
+  p2_1 <- SpatialFeaturePlot(spatial, features = gene,image.alpha=0.3,images = "image2") + ggtitle("Slice2") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5))
+ 
+   plot.list[[gene]] <- list(p1_1,p2_1)
+}
+
+for (i in names(plot.list)){
+  print(plot.list[[i]][[1]]+plot.list[[i]][[2]])
+}
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/SpatialExpression_Ect_denovo-genes_CP.pdf",width=9,height=9)
+cowplot::plot_grid(plot.list[[1]][[1]],plot.list[[1]][[2]],NULL,
+                   plot.list[[2]][[1]],plot.list[[2]][[2]],
+                   plot.list[[3]][[1]],plot.list[[3]][[2]],NULL,
+                   plot.list[[4]][[1]],plot.list[[4]][[2]],
+                   plot.list[[5]][[1]],plot.list[[5]][[2]],
+                   ncol=5,nrow = 3,rel_widths = c(1, 1, 0.2, 1, 1))
+dev.off()
+```

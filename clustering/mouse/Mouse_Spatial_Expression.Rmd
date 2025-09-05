@@ -1,0 +1,1509 @@
+---
+title: "Mouse_Spatial_Expression"
+output: html_document
+date: "2025-04-17"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "/scr1/users/manchela/Data") 
+library(Seurat)
+library(SeuratDisk)
+library(tidyverse)
+library(harmony)
+library(dplyr)
+library(patchwork)
+library(viridis)
+library(ggforce)
+library(gghalves)
+library(ggridges)
+library(scCustomize)
+library(SCpubr)
+library(dplyr)
+library(DropletUtils)
+library(biomaRt)
+library(limma)
+library(pheatmap)
+library(grid)
+library(openxlsx)
+library(clusterProfiler)
+library(enrichplot)
+library(org.Hs.eg.db)
+library(AnnotationHub)
+library(ReactomePA)
+library(DOSE)
+library(orthogene)
+library(factoextra)
+library(smerc)
+library(Rfast)
+library(GeneOverlap)
+library(reshape2)
+library(ggvenn)
+library(scales)
+options(future.globals.maxSize = 10 * 1024^3)
+
+```
+
+Loading in mouse scRNA-seq with main cell type and subtype annotations
+Loading in Dsouza E15.5 mouse spatial transcriptomics slice 
+```{r}
+cds <- readRDS("face_mouse_final.rds")
+cds_E15 <- cds[,grep("E15",cds$orig.ident)]
+cds_E15 <- FindVariableFeatures(cds_E15)
+
+mouse_spatial <- readRDS("DSOUZA_anno_spatial.rds")
+mouse_spatial1 <- subset(mouse_spatial,cells = rownames(mouse_spatial@meta.data[mouse_spatial$stage == "E15.5",]))
+
+```
+
+
+```{r}
+plot1 <- VlnPlot(mouse_spatial1, features = "nCount_Spatial", pt.size = 0.1,group.by="stage") + NoLegend()
+plot2 <- SpatialFeaturePlot(mouse_spatial1, features = "nCount_Spatial",pt.size.factor = 5) + theme(legend.position = "right")
+wrap_plots(plot1, plot2)
+```
+
+find transfer anchors between mouse E15.5 scRNAseq and Dsouza E15.5 spatial transcriptomics slice
+```{r}
+Idents(cds_E15) <- cds_E15$subtype
+
+#project the scRNA from our data onto the E15.5 head section spatial transcriptomics 
+anchors <- FindTransferAnchors(reference = cds_E15, query = mouse_spatial1, reduction = "cca",dims = 1:30,features = intersect(VariableFeatures(cds_E15),rownames(mouse_spatial1)))
+
+# saveRDS(anchors,"mouse_spatial_anchors_cca_E15only_27Mar.rds")
+
+
+```
+
+add predicted labels to spatial object
+```{r}
+anchors_cca <- readRDS("mouse_spatial_anchors_cca_E15only_27Mar.rds")
+predicted.labels <- TransferData(anchorset = anchors_cca, refdata = cds_E15$subtype , dims = 1:30 ,weight.reduction="cca")
+mouse_spatial1$subtype_cca <- predicted.labels$predicted.id
+mouse_spatial1$subtype_cca <- factor(mouse_spatial1$subtype_cca)
+
+predicted.labels <- TransferData(anchorset = anchors_cca, refdata = cds_E15$cell_type1 , dims = 1:30 ,weight.reduction="cca")
+mouse_spatial1$celltype_cca <- predicted.labels$predicted.id
+mouse_spatial1$celltype_cca <- factor(mouse_spatial1$celltype_cca,
+                                      levels=levels(cds_E15$cell_type1))
+```
+
+plotting results
+```{r}
+p1 <- SpatialDimPlot(mouse_spatial1,group.by="celltype_cca",pt.size.factor = 5,image.alpha = 0.5,stroke=0.5) + theme(legend.position = "bottom",
+                                                                                                             legend.title=element_blank()) + 
+  guides(fill = guide_legend(override.aes = list(size=5)))
+
+p2 <- SpatialDimPlot(mouse_spatial1,group.by="subtype_cca",pt.size.factor = 5,image.alpha = 0.5,stroke=0.5) + theme(legend.position = "right",
+                                                                                                             legend.title=element_blank()) + 
+  guides(fill = guide_legend(override.aes = list(size=5),ncol=2))
+
+p1
+p2
+
+
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Spatial_DSOUZA_E15_cca_celltype_labeltransfer_SpatialDimPlot.pdf",width=8,height=6.5)
+p1
+dev.off()
+
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Spatial_DSOUZA_E15_cca_subtype_labeltransfer_SpatialDimPlot.pdf",width=8,height=6.5)
+p2
+dev.off()
+```
+
+picking select subtypes and replotting
+```{r}
+mouse_spatial1$subtype_cca_toplot <- as.character(mouse_spatial1$subtype_cca)
+mouse_spatial1$subtype_cca_toplot[which(mouse_spatial1$subtype_cca_toplot%in%c("dental.2","ect.EBF","fusion.mes2","mesenchymal.CNCC","MxP.surface","palate","periderm","pituitary","pLNP.fusion","schwann1","schwann2","surface3","lCNCC1","neural","MxP2","MandibularArch","cycling","immune"))] <- "other cell types"
+mouse_spatial1$subtype_cca_toplot <- factor(mouse_spatial1$subtype_cca_toplot)
+
+colors <- c(hue_pal()(length(levels(mouse_spatial1$subtype_cca_toplot))-1),"#E4E1E3FF")
+
+mouse_spatial1$subtype_cca_toplot <- factor(mouse_spatial1$subtype_cca_toplot,
+                                                                                    levels=c(sort(levels(mouse_spatial1$subtype_cca_toplot)[-which(levels(mouse_spatial1$subtype_cca_toplot)=="other cell types")]),"other cell types"))
+
+names(colors) <- levels(mouse_spatial1$subtype_cca_toplot)
+
+
+
+
+p <- SpatialDimPlot(mouse_spatial1,group.by="subtype_cca_toplot",pt.size.factor = 5,image.alpha = 0.5,stroke=0.5,cols =  colors) + theme(legend.position = "right",legend.title=element_blank()) + 
+  guides(fill = guide_legend(override.aes = list(size=5),ncol=2))
+
+p
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Spatial_DSOUZA_E15_cca_selectedsubtypes_labeltransfer_SpatialDimPlot.pdf",width=8,height=6.5)
+p
+dev.off()
+```
+
+
+plot one figure for each subtype
+```{r}
+plot.list <- list()
+for (subtype in unique(as.character(mouse_spatial1$subtype_cca))){
+  plot.list[[subtype]] <- SpatialDimPlot(mouse_spatial1,pt.size.factor = 5,image.alpha = 0.5,stroke=0.5,
+                                         cells.highlight=list(which(mouse_spatial1$subtype_cca==subtype))) + 
+    NoLegend()+
+    ggtitle(subtype) +
+    theme(plot.title = element_text(hjust = 0.5))
+}
+
+for(subtype in unique(as.character(mouse_spatial1$subtype_cca))){
+  print(plot.list[[subtype]])
+}
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Spatial_DSOUZA_E15_cca_subtype_labeltransfer_SpatialDimPlot_highlightedCelltypes.pdf",width=24,height=24)
+cowplot::plot_grid(plotlist = plot.list,ncol=6,nrow = 6)
+dev.off()
+```
+
+plot one figure for each main cell type
+```{r}
+colors <- hue_pal()(8)
+plot.list <- list()
+for (celltype in levels(mouse_spatial1$celltype_cca)){
+  if (length(which(mouse_spatial1$celltype_cca==celltype))>0){
+  plot.list[[celltype]] <- SpatialDimPlot(mouse_spatial1,pt.size.factor = 5,image.alpha = 0.5,stroke=0.5,
+                                         cells.highlight=list(which(mouse_spatial1$celltype_cca==celltype)),
+                                         cols.highlight = c(colors[which(levels(mouse_spatial1$celltype_cca)==celltype)],"grey50")) + 
+    NoLegend()+
+    ggtitle(celltype) +
+    theme(plot.title = element_text(hjust = 0.5))
+  } else{
+      plot.list[[celltype]] <- SpatialDimPlot(mouse_spatial1,pt.size.factor = 5,image.alpha = 0.5,stroke=0.5,
+                                         cells.highlight=list(which(mouse_spatial1$celltype_cca==celltype)),
+                                         cols.highlight = "grey50") + 
+    NoLegend()+
+    ggtitle(celltype) +
+    theme(plot.title = element_text(hjust = 0.5))
+  }
+}
+
+
+```
+
+```{r}
+for(celltype in levels(mouse_spatial1$celltype_cca)){
+  print(plot.list[[celltype]])
+}
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Spatial_DSOUZA_E15_cca_celltype_labeltransfer_SpatialDimPlot_highlightedMainCelltypes.pdf",width=12,height=6)
+cowplot::plot_grid(plotlist = plot.list,ncol=4,nrow = 2)
+dev.off()
+```
+
+```{r}
+# saveRDS(mouse_spatial1,"DSOUZA_anno_spatial_E15_final.rds")
+```
+
+
+now loading in human scRNAseq data for transferring to mouse spatial data
+```{r}
+human_sobj <-readRDS("human_face_no-neuro_clustering_cellrangerARC-raw_emptyDrops_singlets_finalannot_27Mar.rds")
+
+annotLookup_ortho_one2one <- orthogene::convert_orthologs(rownames(human_sobj),input_species="human",output_species = "mouse",
+                                                          non121_strategy = "drop_both_species")
+
+mouse_spatial1_subset <- mouse_spatial1[which(rownames(mouse_spatial1)%in%rownames(annotLookup_ortho_one2one)),]
+human_sobj_subset<- human_sobj[match(annotLookup_ortho_one2one$input_gene[match(rownames(mouse_spatial1_subset),rownames(annotLookup_ortho_one2one))],
+                                     rownames(human_sobj)),]
+rownames(human_sobj_subset) <- rownames(annotLookup_ortho_one2one)[match(rownames(human_sobj_subset),annotLookup_ortho_one2one$input_gene)]
+
+Idents(human_sobj_subset) <- human_sobj_subset$subtype
+human_sobj_subset <- FindVariableFeatures(human_sobj_subset)
+
+```
+
+```{r}
+anchors <- FindTransferAnchors(reference = human_sobj_subset, query = mouse_spatial1_subset,
+                               reduction = "cca",dims = 1:30,features = VariableFeatures(human_sobj_subset))
+
+# saveRDS(anchors,"human_to_mouse_spatial_anchors_cca_27Mar.rds")
+```
+
+
+```{r}
+anchors <- readRDS("human_to_mouse_spatial_anchors_cca_27Mar.rds")
+anchors_cca <- anchors
+predicted.labels <- TransferData(anchorset = anchors_cca, refdata = human_sobj_subset$subtype ,
+                                 dims = 1:30 ,weight.reduction="cca")
+mouse_spatial1_subset$subtype_cca <- predicted.labels$predicted.id
+mouse_spatial1_subset$subtype_cca <- factor(mouse_spatial1_subset$subtype_cca)
+
+predicted.labels <- TransferData(anchorset = anchors_cca, refdata = human_sobj_subset$celltype ,
+                                 dims = 1:30 ,weight.reduction="cca")
+mouse_spatial1_subset$celltype_cca <- predicted.labels$predicted.id
+mouse_spatial1_subset$celltype_cca <- factor(mouse_spatial1_subset$celltype_cca,
+                                      levels=levels(human_sobj_subset$celltype))
+
+```
+
+```{r}
+colors <- ColorBlind_Pal()
+names(colors) <- levels(mouse_spatial1_subset$celltype_cca)
+colors[1] <- "#E27A5E"
+p1 <- SpatialDimPlot(mouse_spatial1_subset,group.by="celltype_cca",pt.size.factor = 5,
+                     image.alpha = 0.5,stroke=0.5,cols = colors) + 
+  theme(legend.position = "bottom",guides(fill = guide_legend(override.aes = list(size=5))))
+
+p1
+
+
+p2 <- SpatialDimPlot(mouse_spatial1_subset,group.by="subtype_cca",pt.size.factor = 5,
+                     image.alpha = 0.5,stroke=0.5) + 
+  theme(legend.position = "right",guides(fill = guide_legend(override.aes = list(size=5),ncol=2)))
+
+p2
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Spatial_DSOUZA_E15_cca_celltype_human-to-mouse_labeltransfer_SpatialDimPlot.pdf",width=8,height=6.5)
+p1
+dev.off()
+
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Spatial_DSOUZA_E15_cca_subtype_human-to-mouse_labeltransfer_SpatialDimPlot.pdf",width=8,height=6.5)
+p2
+dev.off()
+```
+
+picking select subtypes and re-plotting
+```{r}
+mouse_spatial1_subset$subtype_cca_toplot <- as.character(mouse_spatial1_subset$subtype_cca)
+mouse_spatial1_subset$subtype_cca_toplot[which(mouse_spatial1_subset$subtype_cca_toplot%in%
+                                                  names(which(table(mouse_spatial1_subset$subtype_cca_toplot)<10)))] <- "other cell types"
+mouse_spatial1_subset$subtype_cca_toplot[which(mouse_spatial1_subset$subtype_cca_toplot%in%c("endothelium","immune","erythrocytes","MesenchymalProg_1","MxP2","NeuralStem_1","Prog_1","surface2","schwann.1","pLNP2"))] <- "other cell types"
+
+mouse_spatial1_subset$subtype_cca_toplot[grep("palatalShelf",mouse_spatial1_subset$subtype_cca_toplot)] <- "palatalShelf"
+mouse_spatial1_subset$subtype_cca_toplot[grep("MandibularArch",mouse_spatial1_subset$subtype_cca_toplot)] <- "MandibularArch"
+mouse_spatial1_subset$subtype_cca_toplot[grep("palatal.fusion",mouse_spatial1_subset$subtype_cca_toplot)] <- "palatal.fusion"
+mouse_spatial1_subset$subtype_cca_toplot[grep("NeuralProg",mouse_spatial1_subset$subtype_cca_toplot)] <- "NeuralProg"
+
+mouse_spatial1_subset$subtype_cca_toplot <- factor(mouse_spatial1_subset$subtype_cca_toplot)
+
+# colors <- c(hue_pal()(length(levels(mouse_spatial1_subset$subtype_cca_toplot))-1),"#E4E1E3FF")
+
+colors <- c(DiscretePalette_scCustomize(num_colors = length(levels(mouse_spatial1_subset$subtype_cca_toplot))-1,
+                                      palette = "alphabet"),"#E4E1E3FF")
+
+mouse_spatial1_subset$subtype_cca_toplot <- factor(mouse_spatial1_subset$subtype_cca_toplot,
+                                            levels=c(sort(levels(mouse_spatial1_subset$subtype_cca_toplot)[-which(levels(mouse_spatial1_subset$subtype_cca_toplot)=="other cell types")]),"other cell types"))
+
+names(colors) <- levels(mouse_spatial1_subset$subtype_cca_toplot)
+
+p <- SpatialDimPlot(mouse_spatial1_subset,group.by="subtype_cca_toplot",
+                    pt.size.factor = 5,image.alpha = 0.5,stroke=0.5,cols =  colors) + 
+  theme(legend.position = "right",legend.title=element_blank()) + 
+  guides(fill = guide_legend(override.aes = list(size=5),ncol=1))
+
+p
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Spatial_DSOUZA_E15_cca_selectedsubtypes_human-to-mouse_labeltransfer_SpatialDimPlot.pdf",width=8,height=6.5)
+p
+dev.off()
+```
+
+plotting each subtype as its own figure
+```{r}
+plot.list <- list()
+for (subtype in unique(as.character(mouse_spatial1_subset$subtype_cca))){
+  plot.list[[subtype]] <- SpatialDimPlot(mouse_spatial1_subset,pt.size.factor = 5,image.alpha = 0.5,stroke=0.5,
+                                         cells.highlight=list(which(mouse_spatial1_subset$subtype_cca==subtype))) + 
+    NoLegend()+
+    ggtitle(subtype) +
+    theme(plot.title = element_text(hjust = 0.5))
+}
+
+for(subtype in unique(as.character(mouse_spatial1$subtype_cca))){
+  print(plot.list[[subtype]])
+}
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Spatial_DSOUZA_E15_cca_celltype_human-to-mouse_labeltransfer_SpatialDimPlot_highlightedCelltypes.pdf",width=28,height=28)
+cowplot::plot_grid(plotlist = plot.list,ncol=7,nrow = 7)
+dev.off()
+
+```
+
+plotting each main cell type as its own figure
+```{r}
+plot.list <- list()
+for (celltype in levels(mouse_spatial1_subset$celltype_cca)){
+  if (length(which(mouse_spatial1_subset$celltype_cca==celltype))>0){
+    plot.list[[celltype]] <- SpatialDimPlot(mouse_spatial1_subset,pt.size.factor = 5,image.alpha = 0.5,stroke=0.5,
+                                            cells.highlight=list(which(mouse_spatial1_subset$celltype_cca==celltype))) + 
+      NoLegend()+
+      ggtitle(celltype) +
+      theme(plot.title = element_text(hjust = 0.5))
+  } else{
+    plot.list[[celltype]] <- SpatialDimPlot(mouse_spatial1_subset,pt.size.factor = 5,image.alpha = 0.5,stroke=0.5,
+                                            cells.highlight=list(which(mouse_spatial1_subset$celltype_cca==celltype)),
+                                            cols.highlight = "grey50") + 
+      NoLegend()+
+      ggtitle(celltype) +
+      theme(plot.title = element_text(hjust = 0.5))
+  }
+}
+
+for(celltype in levels(mouse_spatial1$celltype_cca)){
+  print(plot.list[[celltype]])
+}
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Spatial_DSOUZA_E15_cca_celltype_human-to-mouse_labeltransfer_SpatialDimPlot_highlightedMainCelltypes.pdf",width=12,height=6)
+cowplot::plot_grid(plotlist = plot.list,ncol=4,nrow = 2)
+dev.off()
+
+```
+
+
+
+```{r}
+mart <-  useMart("ENSEMBL_MART_ENSEMBL") #, host = "https://useast.ensembl.org")
+mart <- useDataset("mmusculus_gene_ensembl", mart)
+annotLookup <- getBM(
+  mart = mart,
+  attributes = c(
+    "mgi_symbol","description",
+    "entrezgene_id","hgnc_symbol",
+    "gene_biotype"),
+  filter = "mgi_symbol",
+  values = rownames(cds),
+  uniqueRows=TRUE)
+```
+
+reading in marker genes
+```{r}
+mouse_main_markers <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/Mouse_SigGenes_E10toE15_MainCellTypes.xlsx")
+mouse_mes_subtype_markers <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/Mouse_SigGenes_mes_SubTypes.xlsx")
+mouse_sox10pos_subtype_markers <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/Mouse_CNCC_SigGenes_subtype_final.xlsx")
+mouse_ect_subtype_markers <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/Mouse_SigGenes_ect_SubTypes.xlsx")
+
+```
+
+top 100 markers for each mouse main cell type
+```{r}
+mouse_main_markers$biotype <- annotLookup$gene_biotype[match(mouse_main_markers$gene,annotLookup$mgi_symbol)]
+mouse_main_markers <- subset(mouse_main_markers, biotype == "protein_coding")
+top <- mouse_main_markers %>% filter(p_val_adj <0.05) %>% group_by(cluster) %>% top_n(10, avg_log2FC)
+top100 <- mouse_main_markers%>% filter(p_val_adj <0.05) %>%   group_by(cluster) %>% top_n(100, avg_log2FC)
+top100pval <- subset(top100, rowSums(top100[5] < 0.05) > 0)
+
+mouse_mesenchyme <- subset(top100pval, cluster == "mesenchyme")
+mouse_sox10pos <- subset(top100pval, cluster == "SOX2-_SOX10+")
+mouse_ectoderm <- subset(top100pval, cluster == "ectoderm")
+mouse_muscle <- subset(top100pval, cluster == "muscle")
+mouse_endothelium <- subset(top100pval, cluster == "endothelium")
+mouse_eryth <- subset(top100pval, cluster == "erythrocytes")
+mouse_immune <- subset(top100pval, cluster == "immune")
+mouse_sox2pos<- subset(top100pval, cluster == "SOX2+_SOX10-")
+
+```
+
+Convert MOSTA h5ad files to h5Seurat files
+```{r}
+Convert("E11.5_E1S1.MOSTA.h5ad", dest = "h5seurat", overwrite = FALSE)
+Convert("E11.5_E1S3.MOSTA.h5ad", dest = "h5seurat", overwrite = FALSE)
+Convert("E11.5_E1S4.MOSTA.h5ad", dest = "h5seurat", overwrite = FALSE)
+
+Convert("Mouse_embryo_all_stage.h5ad", dest = "h5seurat", overwrite = FALSE)
+```
+
+```{r}
+Convert("E15.5_E1S4.MOSTA.h5ad", dest = "h5seurat", overwrite = TRUE)
+Convert("E15.5_E2S1.MOSTA.h5ad", dest = "h5seurat", overwrite = TRUE)
+
+```
+
+```{r}
+#load spatial data
+all_stages <-  LoadH5Seurat("Mouse_embryo_all_stage.h5seurat",assays ="RNA")
+p <- DimPlot(all_stages, reduction = "spatial", group.by = "annotation")+NoAxes()+NoLegend()
+p
+
+```
+
+
+```{r}
+
+#load spatial data
+seu1 <-  LoadH5Seurat("E11.5_E1S1.MOSTA.h5seurat",assays ="RNA")
+p <- DimPlot(seu1, reduction = "spatial", group.by = "annotation")+NoAxes()+NoLegend()
+p
+
+Embedding <- as.data.frame(seu1@reductions$spatial@cell.embeddings)
+seu1$x <- as.numeric(Embedding$spatial_1)+150
+seu1$y <- -as.numeric(Embedding$spatial_2)+400
+seu1$section <- "S01"
+```
+
+```{r}
+seu2 <-  LoadH5Seurat("E11.5_E1S3.MOSTA.h5seurat",assays ="RNA")
+p <- DimPlot(seu2, reduction = "spatial", group.by = "annotation")+NoAxes()+NoLegend()
+p
+Embedding <- as.data.frame(seu2@reductions$spatial@cell.embeddings)
+seu2$x <- as.numeric(Embedding$spatial_1)-150
+seu2$y <- -as.numeric(Embedding$spatial_2)-50
+seu2$section <- "S02"
+
+```
+
+```{r}
+
+seu3 <-  LoadH5Seurat("E11.5_E1S4.MOSTA.h5seurat",assays ="RNA")
+p <- DimPlot(seu3, reduction = "spatial", group.by = "annotation")+NoAxes()+NoLegend()
+p
+Embedding <- as.data.frame(seu3@reductions$spatial@cell.embeddings)
+seu3$x <- as.numeric(Embedding$spatial_1)+100
+seu3$y <- -as.numeric(Embedding$spatial_2)+300
+seu3$section <- "S03"
+```
+add images for E11.5 slices
+```{r}
+obj.list <- list(seu1,seu2,seu3)
+#create an image for each section
+for (j in 1:3) {
+  
+positions = obj.list[[j]]@meta.data[, c("x","y")]
+obj.list[[j]][["image"]] <- new(
+  Class = 'SlideSeq',
+  assay = 'RNA',
+  coordinates = positions
+)
+}
+# seu <- cds
+```
+
+```{r}
+obj.list
+# saveRDS(obj.list,"MOSTA_mouseE11.5_sobj.rds")
+```
+
+```{r}
+obj.list <- readRDS("MOSTA_mouseE11.5_sobj.rds")
+```
+
+merge E11.5 slices
+```{r}
+merge_MOSTA_E11 <- merge(x=obj.list[[1]],y=c(obj.list[[2]],obj.list[[3]]))
+```
+
+
+add image for all stages
+```{r}
+Embedding <- as.data.frame(all_stages@reductions$spatial@cell.embeddings)
+all_stages$x <- as.numeric(Embedding$spatial_1)
+all_stages$y <- as.numeric(Embedding$spatial_2)
+
+positions = all_stages@meta.data[, c("x","y")]
+all_stages[["image"]] <- new(
+  Class = 'SlideSeq',
+  assay = 'RNA',
+  coordinates = positions
+)
+
+```
+
+
+```{r}
+p1 <- SpatialDimPlot(all_stages,group.by="annotation",images = "image")  +
+  theme(legend.position = "bottom",guides(fill = guide_legend(override.aes = list(size=5))))
+
+p1
+```
+
+
+```{r}
+
+#load spatial data
+seu1 <-  LoadH5Seurat("E15.5_E1S4.MOSTA.h5seurat",assays ="RNA")
+p <- DimPlot(seu1, reduction = "spatial", group.by = "annotation")+NoAxes()+NoLegend()
+p
+
+Embedding <- as.data.frame(seu1@reductions$spatial@cell.embeddings)
+seu1$x <- as.numeric(Embedding$spatial_1)+150
+seu1$y <- -as.numeric(Embedding$spatial_2)+400
+seu1$section <- "S01"
+```
+
+```{r}
+seu2 <-  LoadH5Seurat("E15.5_E2S1.MOSTA.h5seurat",assays ="RNA")
+p <- DimPlot(seu2, reduction = "spatial", group.by = "annotation")+NoAxes()+NoLegend()
+p
+Embedding <- as.data.frame(seu2@reductions$spatial@cell.embeddings)
+seu2$x <- as.numeric(Embedding$spatial_1)-150
+seu2$y <- -as.numeric(Embedding$spatial_2)-50
+seu2$section <- "S02"
+
+```
+add images for E15.5 slices
+```{r}
+obj.list <- list(seu1,seu2)
+#create an image for each section
+for (j in 1:2) {
+  
+positions = obj.list[[j]]@meta.data[, c("x","y")]
+obj.list[[j]][["image"]] <- new(
+  Class = 'SlideSeq',
+  assay = 'RNA',
+  coordinates = positions
+)
+}
+# seu <- cds
+```
+
+```{r}
+obj.list
+# saveRDS(obj.list,"MOSTA_mouseE15.5_sobj.rds")
+```
+
+merge E15.5 slices
+```{r}
+merge_MOSTA_E15 <- merge(x=obj.list[[1]],y=c(obj.list[[2]]))
+# saveRDS(merge_MOSTA,"MOSTA_mouseE15.5_sobj_merged.rds")
+```
+
+
+load in human scRNAseq data and convert human gene names to mouse gene names
+```{r}
+human_sobj <-readRDS("human_face_no-neuro_clustering_cellrangerARC-raw_emptyDrops_singlets_finalannot_27Mar.rds")
+
+annotLookup_ortho_one2one <- orthogene::convert_orthologs(rownames(human_sobj),input_species="human",output_species = "mouse",
+                                                          non121_strategy = "drop_both_species")
+
+all_stages_subset <- all_stages[which(rownames(all_stages)%in%rownames(annotLookup_ortho_one2one)),]
+human_sobj_subset<- human_sobj[match(annotLookup_ortho_one2one$input_gene[match(rownames(all_stages_subset),rownames(annotLookup_ortho_one2one))],
+                                     rownames(human_sobj)),]
+rownames(human_sobj_subset) <- rownames(annotLookup_ortho_one2one)[match(rownames(human_sobj_subset),annotLookup_ortho_one2one$input_gene)]
+
+Idents(human_sobj_subset) <- human_sobj_subset$subtype
+human_sobj_subset <- FindVariableFeatures(human_sobj_subset)
+```
+
+```{r}
+# saveRDS(all_stages_subset,"Mouse_embryo_all_stage.rds")
+```
+
+find transfer anchors for all stages
+```{r}
+Idents(all_stages_subset) <- all_stages_subset$annotation
+
+#project the scRNA from human data onto the MOSTA spatial transcriptomics sections
+anchors <- FindTransferAnchors(reference = human_sobj_subset, query = all_stages_subset,
+                               reduction = "cca",dims = 1:30,features = VariableFeatures(human_sobj_subset))
+
+
+# saveRDS(anchors,"mouse_spatial_anchors_cca_MOSTA_all-stages.rds")
+
+```
+
+```{r}
+anchors <- readRDS("mouse_spatial_anchors_cca_MOSTA_all-stages.rds")
+anchors_cca <- anchors
+predicted.labels <- TransferData(anchorset = anchors_cca, refdata = human_sobj_subset$subtype ,
+                                 dims = 1:30 ,weight.reduction="cca")
+all_stages_subset$subtype_cca <- predicted.labels$predicted.id
+all_stages_subset$subtype_cca <- factor(all_stages_subset$subtype_cca)
+
+predicted.labels <- TransferData(anchorset = anchors_cca, refdata = human_sobj_subset$celltype ,
+                                 dims = 1:30 ,weight.reduction="cca")
+all_stages_subset$celltype_cca <- predicted.labels$predicted.id
+all_stages_subset$celltype_cca <- factor(all_stages_subset$celltype_cca,
+                                      levels=levels(human_sobj_subset$celltype))
+
+```
+
+```{r}
+ # saveRDS(all_stages_subset,"Mouse_embryo_all_stage_subset.rds")
+```
+
+```{r}
+Embedding <- as.data.frame(all_stages_subset@reductions$spatial@cell.embeddings)
+all_stages_subset$x <- as.numeric(Embedding$spatial_1)
+all_stages_subset$y <- as.numeric(Embedding$spatial_2)
+all_stages_subset$section <- "S01"
+
+positions = all_stages_subset@meta.data[, c("x","y")]
+all_stages_subset[["image"]] <- new(
+  Class = 'SlideSeq',
+  assay = 'RNA',
+  coordinates = positions
+)
+
+```
+
+
+plot the transfered main cell types and subtypes
+```{r}
+colors <- ColorBlind_Pal()
+names(colors) <- levels(all_stages_subset$celltype_cca)
+colors[1] <- "#E27A5E"
+p1 <- SpatialDimPlot(all_stages_subset,group.by="celltype_cca",cols = colors,pt.size.factor = 0.3,alpha = 0.8) +
+  theme(legend.position = "bottom",guides(fill = guide_legend(override.aes = list(size=5))))
+
+p1
+
+
+p2 <- SpatialDimPlot(all_stages_subset,group.by="subtype_cca",images = "image",pt.size.factor = 0.3,alpha = 0.8) +
+  theme(legend.position = "right",guides(fill = guide_legend(override.aes = list(size=5),ncol=2)))
+
+p2
+
+
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Spatial_MOSTA_allstages_cca_celltype_human-to-mouse_labeltransfer_SpatialDimPlot-0.3ptsize.pdf",width=17,height=22)
+p1
+p2
+dev.off()
+```
+
+picking select subtypes to plot
+```{r}
+all_stages_subset$subtype_cca_toplot <- as.character(all_stages_subset$subtype_cca)
+# all_stages_subset$subtype_cca_toplot[which(all_stages_subset$subtype_cca_toplot%in%
+#                                                   names(which(table(all_stages_subset$subtype_cca_toplot)<10)))] <- "other cell types"
+all_stages_subset$subtype_cca_toplot[which(all_stages_subset$subtype_cca_toplot%in%c("ncl1","ncl4","ncl2","ncl3","melanocytes","cycling.CNCC.1","cycling.CNCC.2"))] <- "other cell types"
+
+all_stages_subset$subtype_cca_toplot[grep("auditory",all_stages_subset$subtype_cca_toplot)] <- "auditory"
+all_stages_subset$subtype_cca_toplot[grep("cycling.CNCC",all_stages_subset$subtype_cca_toplot)] <- "cycling.CNCC"
+all_stages_subset$subtype_cca_toplot[grep("dental",all_stages_subset$subtype_cca_toplot)] <- "dental"
+all_stages_subset$subtype_cca_toplot[grep("early.CNCC",all_stages_subset$subtype_cca_toplot)] <- "early.CNCC"
+all_stages_subset$subtype_cca_toplot[grep("fusion.mes2",all_stages_subset$subtype_cca_toplot)] <- "fusion.mes2"
+all_stages_subset$subtype_cca_toplot[grep("int.CNCC",all_stages_subset$subtype_cca_toplot)] <- "int.CNCC"
+all_stages_subset$subtype_cca_toplot[grep("MandibularArch",all_stages_subset$subtype_cca_toplot)] <- "MandibularArch"
+all_stages_subset$subtype_cca_toplot[grep("MesenchymalLikeProg",all_stages_subset$subtype_cca_toplot)] <- "MesenchymalProg"
+all_stages_subset$subtype_cca_toplot[grep("MesenchymalProg",all_stages_subset$subtype_cca_toplot)] <- "MesenchymalProg"
+all_stages_subset$subtype_cca_toplot[grep("MxP.surface",all_stages_subset$subtype_cca_toplot)] <- "MxP.surface"
+all_stages_subset$subtype_cca_toplot[grep("NeuralProg",all_stages_subset$subtype_cca_toplot)] <- "NeuralProg"
+all_stages_subset$subtype_cca_toplot[grep("NeuralStem",all_stages_subset$subtype_cca_toplot)] <- "NeuralStem"
+all_stages_subset$subtype_cca_toplot[grep("palatal.fusion",all_stages_subset$subtype_cca_toplot)] <- "palatal.fusion"
+all_stages_subset$subtype_cca_toplot[grep("palatalShelf",all_stages_subset$subtype_cca_toplot)] <- "palatalShelf"
+all_stages_subset$subtype_cca_toplot[grep("palate.surface",all_stages_subset$subtype_cca_toplot)] <- "palate.surface"
+all_stages_subset$subtype_cca_toplot[grep("palate.",all_stages_subset$subtype_cca_toplot)] <- "palate"
+all_stages_subset$subtype_cca_toplot[grep("Prog_",all_stages_subset$subtype_cca_toplot)] <- "Prog"
+all_stages_subset$subtype_cca_toplot[grep("schwann",all_stages_subset$subtype_cca_toplot)] <- "schwann"
+all_stages_subset$subtype_cca_toplot[grep("surface",all_stages_subset$subtype_cca_toplot)] <- "surface"
+
+
+all_stages_subset$subtype_cca_toplot <- factor(all_stages_subset$subtype_cca_toplot)
+
+# colors <- c(hue_pal()(length(levels(all_stages_subset$subtype_cca_toplot))-1),"#E4E1E3FF")
+
+# colors <- DiscretePalette_scCustomize(num_colors = length(unique(all_stages_subset$subtype_cca_toplot)),
+#                                       palette = "varibow")
+# 
+# names(colors) <- levels(all_stages_subset$subtype_cca_toplot)
+# SpatialDimPlot(all_stages_subset,group.by="subtype_cca_toplot", cols = colors)
+
+colors <- c(DiscretePalette_scCustomize(num_colors = length(levels(all_stages_subset$subtype_cca_toplot))-1,
+                                      palette = "varibow"),"#E4E1E3FF")
+
+all_stages_subset$subtype_cca_toplot <- factor(all_stages_subset$subtype_cca_toplot,
+                                            levels=c(sort(levels(all_stages_subset$subtype_cca_toplot)[-which(levels(all_stages_subset$subtype_cca_toplot)=="other cell types")]),"other cell types"))
+
+names(colors) <- levels(all_stages_subset$subtype_cca_toplot)
+
+p <- SpatialDimPlot(all_stages_subset,group.by="subtype_cca_toplot",cols =  colors) + 
+  theme(legend.position = "right",legend.title=element_blank()) + 
+  guides(fill = guide_legend(override.aes = list(size=5),ncol=2))
+
+p
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Spatial_DSOUZA_allstages_cca_selectedsubtypes_human-to-mouse_labeltransfer_SpatialDimPlot.pdf",width=16,height=14)
+p
+dev.off()
+```
+
+plotting a figure for each subtype
+```{r}
+plot.list <- list()
+for (subtype in unique(as.character(all_stages_subset$subtype_cca))){
+  colors <- rep("grey50",length(levels(all_stages_subset$subtype_cca)))
+  names(colors) <- levels(all_stages_subset$subtype_cca)
+  colors[which(names(colors)==subtype)] <- "#DE2D26"
+  
+  plot.list[[subtype]] <- SpatialDimPlot(all_stages_subset,group.by="subtype_cca",cols = colors,pt.size.factor = 0.3,alpha=0.8) + 
+    NoLegend()+
+    ggtitle(subtype) +
+    theme(plot.title = element_text(hjust = 0.5))
+}
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Spatial_MOSTA_allstages_cca_celltype_human-to-mouse_labeltransfer_SpatialDimPlot_highlightedSubtypes-0.3ptsize.pdf",width=8.5,height=11)
+for(subtype in unique(as.character(all_stages_subset$subtype_cca))){
+  print(plot.list[[subtype]])
+}
+dev.off()
+
+```
+
+picking select subtypes to plot
+```{r}
+all_stages_subset$subtype_cca_toplot2 <- as.character(all_stages_subset$subtype_cca_toplot)
+all_stages_subset$subtype_cca_toplot2[which(all_stages_subset$subtype_cca_toplot2%in%setdiff(unique(all_stages_subset$subtype_cca_toplot2),c("MxP2","palate","periderm","cartilage","palatalShelf","LNP","fusion.mes2","surface")))] <- "other cell types"
+
+
+
+all_stages_subset$subtype_cca_toplot2 <- factor(all_stages_subset$subtype_cca_toplot2)
+
+colors <- c(DiscretePalette_scCustomize(num_colors = length(levels(all_stages_subset$subtype_cca_toplot2))-1,
+                                      palette = "ditto_seq"),"#E4E1E3FF")
+
+all_stages_subset$subtype_cca_toplot2 <- factor(all_stages_subset$subtype_cca_toplot2,
+                                            levels=c(sort(levels(all_stages_subset$subtype_cca_toplot2)[-which(levels(all_stages_subset$subtype_cca_toplot2)=="other cell types")]),"other cell types"))
+
+names(colors) <- levels(all_stages_subset$subtype_cca_toplot2)
+
+colors[which(names(colors)=="periderm")] <- "black"
+colors[which(names(colors)=="surface")] <- "#A47DAB"
+colors[which(names(colors)=="cartilage")] <- "#FD3DB5"
+colors[which(names(colors)=="palatalShelf")] <- "darkblue"
+colors[which(names(colors)=="LNP")] <- "green"
+
+
+p <- SpatialDimPlot(all_stages_subset,group.by="subtype_cca_toplot2",cols =  colors,
+                    pt.size.factor = 0.3,alpha = 0.8) + 
+  theme(legend.position = "bottom",legend.title=element_blank()) + 
+  guides(fill = guide_legend(override.aes = list(size=5),nrow=2))
+
+p
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Spatial_DSOUZA_allstages_cca_selectedsubtypes2_human-to-mouse_labeltransfer_SpatialDimPlot-0.3ptsize.pdf",width=17,height=22)
+p
+dev.off()
+```
+
+read in human data and convert human gene symbols to mouse for MOSTA E11.5 and E15.5
+```{r}
+human_sobj <-readRDS("human_face_no-neuro_clustering_cellrangerARC-raw_emptyDrops_singlets_finalannot_27Mar.rds")
+
+annotLookup_ortho_one2one <- orthogene::convert_orthologs(rownames(human_sobj),input_species="human",output_species = "mouse",
+                                                          non121_strategy = "drop_both_species")
+
+merge_MOSTA_E11_subset <- merge_MOSTA[which(rownames(merge_MOSTA_E11)%in%rownames(annotLookup_ortho_one2one)),]
+human_sobj_subset<- human_sobj[match(annotLookup_ortho_one2one$input_gene[match(rownames(merge_MOSTA_E11_subset),rownames(annotLookup_ortho_one2one))],
+                                     rownames(human_sobj)),]
+rownames(human_sobj_subset) <- rownames(annotLookup_ortho_one2one)[match(rownames(human_sobj_subset),annotLookup_ortho_one2one$input_gene)]
+
+Idents(human_sobj_subset) <- human_sobj_subset$subtype
+human_sobj_subset <- FindVariableFeatures(human_sobj_subset)
+
+orthogene::convert_orthologs(rownames(human_sobj),input_species="human",output_species = "mouse",
+                                                          non121_strategy = "drop_both_species")
+
+merge_MOSTA_E15_subset <- merge_MOSTA[which(rownames(merge_MOSTA_E15)%in%rownames(annotLookup_ortho_one2one)),]
+human_sobj_subset<- human_sobj[match(annotLookup_ortho_one2one$input_gene[match(rownames(merge_MOSTA_E15_subset),rownames(annotLookup_ortho_one2one))],
+                                     rownames(human_sobj)),]
+rownames(human_sobj_subset) <- rownames(annotLookup_ortho_one2one)[match(rownames(human_sobj_subset),annotLookup_ortho_one2one$input_gene)]
+
+Idents(human_sobj_subset) <- human_sobj_subset$subtype
+human_sobj_subset <- FindVariableFeatures(human_sobj_subset)
+```
+
+find transfer anchors for both E11.5 and E15.5
+```{r}
+Idents(merge_MOSTA_subset_E11) <- merge_MOSTA_subset_E11$annotation
+
+#project the scRNA from human data onto the E15.5 head section spatial transcriptomics 
+anchors <- FindTransferAnchors(reference = human_sobj_subset, query = merge_MOSTA_subset_E11,
+                               reduction = "cca",dims = 1:30,features = VariableFeatures(human_sobj_subset))
+
+# saveRDS(anchors,"mouse_spatial_anchors_cca_MOSTA_E11only.rds")
+
+Idents(merge_MOSTA_subset_E15) <- merge_MOSTA_subset_E15$annotation
+
+#project the scRNA from human data onto the E15.5 head section spatial transcriptomics 
+anchors <- FindTransferAnchors(reference = human_sobj_subset, query = merge_MOSTA_subset_E15,
+                               reduction = "cca",dims = 1:30,features = VariableFeatures(human_sobj_subset))
+
+# saveRDS(anchors,"mouse_spatial_anchors_cca_MOSTA_E15only.rds")
+
+
+```
+
+```{r}
+anchors <- readRDS("mouse_spatial_anchors_cca_MOSTA_E11only.rds")
+anchors_cca <- anchors
+predicted.labels <- TransferData(anchorset = anchors_cca, refdata = human_sobj_subset$subtype ,
+                                 dims = 1:30 ,weight.reduction="cca")
+merge_MOSTA_subset_E11$subtype_cca <- predicted.labels$predicted.id
+merge_MOSTA_subset_E11$subtype_cca <- factor(merge_MOSTA_subset_E11$subtype_cca)
+
+predicted.labels <- TransferData(anchorset = anchors_cca, refdata = human_sobj_subset$celltype ,
+                                 dims = 1:30 ,weight.reduction="cca")
+merge_MOSTA_subset_E11$celltype_cca <- predicted.labels$predicted.id
+merge_MOSTA_subset_E11$celltype_cca <- factor(merge_MOSTA_subset_E11$celltype_cca,
+                                      levels=levels(human_sobj_subset$celltype))
+
+# saveRDS(merge_MOSTA_subset_E11,"MOSTA_mouseE15.5_sobj_merged_subset.rds")
+```
+
+```{r}
+anchors <- readRDS("mouse_spatial_anchors_cca_MOSTA_E15only.rds")
+anchors_cca <- anchors
+predicted.labels <- TransferData(anchorset = anchors_cca, refdata = human_sobj_subset$subtype ,
+                                 dims = 1:30 ,weight.reduction="cca")
+merge_MOSTA_subset_E15$subtype_cca <- predicted.labels$predicted.id
+merge_MOSTA_subset_E15$subtype_cca <- factor(merge_MOSTA_subset_E15$subtype_cca)
+
+predicted.labels <- TransferData(anchorset = anchors_cca, refdata = human_sobj_subset$celltype ,
+                                 dims = 1:30 ,weight.reduction="cca")
+merge_MOSTA_subset_E15$celltype_cca <- predicted.labels$predicted.id
+merge_MOSTA_subset_E15$celltype_cca <- factor(merge_MOSTA_subset_E15$celltype_cca,
+                                      levels=levels(human_sobj_subset$celltype))
+
+# saveRDS(merge_MOSTA_subset_E15,"MOSTA_mouseE15.5_sobj_merged_subset.rds")
+```
+
+plotting for E11.5
+```{r}
+merge_MOSTA_subset <- merge_MOSTA_subset_E11
+colors <- ColorBlind_Pal()
+names(colors) <- levels(merge_MOSTA_subset$celltype_cca)
+colors[1] <- "#E27A5E"
+p1 <- SpatialDimPlot(merge_MOSTA_subset,group.by="celltype_cca",cols = colors,images = "image") + 
+  ggtitle("Image1") +
+  theme(legend.position = "bottom",guides(fill = guide_legend(override.aes = list(size=5))))
+
+p1
+
+
+p2 <- SpatialDimPlot(merge_MOSTA_subset,group.by="subtype_cca",images = "image") + 
+  ggtitle("Image1") + 
+  theme(legend.position = "right",guides(fill = guide_legend(override.aes = list(size=5),ncol=2)))
+
+p2
+
+p3 <- SpatialDimPlot(merge_MOSTA_subset,group.by="celltype_cca",cols = colors,images = "image.2") + 
+  ggtitle("Image2") +
+  theme(legend.position = "bottom",guides(fill = guide_legend(override.aes = list(size=5))))
+
+p3
+
+
+p4 <- SpatialDimPlot(merge_MOSTA_subset,group.by="subtype_cca",images = "image.2") + 
+  ggtitle("Image2") + 
+  theme(legend.position = "right",guides(fill = guide_legend(override.aes = list(size=5),ncol=2)))
+
+p4
+
+p5 <- SpatialDimPlot(merge_MOSTA_subset,group.by="celltype_cca",cols = colors,images = "image.3") + 
+  ggtitle("Image3") +
+  theme(legend.position = "bottom",guides(fill = guide_legend(override.aes = list(size=5))))
+
+p5
+
+
+p6 <- SpatialDimPlot(merge_MOSTA_subset,group.by="subtype_cca",images = "image.3") + 
+  ggtitle("Image3") + 
+  theme(legend.position = "right",guides(fill = guide_legend(override.aes = list(size=5),ncol=2)))
+
+p6
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Spatial_MOSTA_E11_cca_celltype_human-to-mouse_labeltransfer_SpatialDimPlot.pdf",width=8,height=6.5)
+p1
+p3
+p5
+dev.off()
+
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Spatial_MOSTA_E11_cca_subtype_human-to-mouse_labeltransfer_SpatialDimPlot.pdf",width=18,height=10)
+p2
+p4
+p6
+dev.off()
+```
+
+plotting for E15.5
+```{r}
+merge_MOSTA_subset <- merge_MOSTA_subset_E15
+colors <- ColorBlind_Pal()
+names(colors) <- levels(merge_MOSTA_subset$celltype_cca)
+colors[1] <- "#E27A5E"
+p1 <- SpatialDimPlot(merge_MOSTA_subset,group.by="celltype_cca",cols = colors,images = "image") + 
+  ggtitle("Image1") +
+  theme(legend.position = "bottom",guides(fill = guide_legend(override.aes = list(size=5))))
+
+p1
+
+
+p2 <- SpatialDimPlot(merge_MOSTA_subset,group.by="subtype_cca",images = "image") + 
+  ggtitle("Image1") + 
+  theme(legend.position = "right",guides(fill = guide_legend(override.aes = list(size=5),ncol=2)))
+
+p2
+
+p3 <- SpatialDimPlot(merge_MOSTA_subset,group.by="celltype_cca",cols = colors,images = "image.2") + 
+  ggtitle("Image2") +
+  theme(legend.position = "bottom",guides(fill = guide_legend(override.aes = list(size=5))))
+
+p3
+
+
+p4 <- SpatialDimPlot(merge_MOSTA_subset,group.by="subtype_cca",images = "image.2") + 
+  ggtitle("Image2") + 
+  theme(legend.position = "right",guides(fill = guide_legend(override.aes = list(size=5),ncol=2)))
+
+p4
+
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Spatial_MOSTA_E15_cca_celltype_human-to-mouse_labeltransfer_SpatialDimPlot.pdf",width=8,height=6.5)
+p1
+p3
+dev.off()
+
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Spatial_MOSTA_E15_cca_subtype_human-to-mouse_labeltransfer_SpatialDimPlot.pdf",width=18,height=10)
+p2
+p4
+dev.off()
+```
+
+plot select subtypes for E15.5
+```{r}
+merge_MOSTA_subset$subtype_cca_toplot <- as.character(merge_MOSTA_subset$subtype_cca)
+# merge_MOSTA_subset$subtype_cca_toplot[which(merge_MOSTA_subset$subtype_cca_toplot%in%
+#                                                   names(which(table(merge_MOSTA_subset$subtype_cca_toplot)<10)))] <- "other cell types"
+merge_MOSTA_subset$subtype_cca_toplot[which(merge_MOSTA_subset$subtype_cca_toplot%in%c("ncl1","ncl2","ncl3","melanocytes","muscle.mes"))] <- "other cell types"
+
+merge_MOSTA_subset$subtype_cca_toplot[grep("auditory",merge_MOSTA_subset$subtype_cca_toplot)] <- "auditory"
+merge_MOSTA_subset$subtype_cca_toplot[grep("cycling.CNCC",merge_MOSTA_subset$subtype_cca_toplot)] <- "cycling.CNCC"
+merge_MOSTA_subset$subtype_cca_toplot[grep("dental",merge_MOSTA_subset$subtype_cca_toplot)] <- "dental"
+merge_MOSTA_subset$subtype_cca_toplot[grep("early.CNCC",merge_MOSTA_subset$subtype_cca_toplot)] <- "early.CNCC"
+merge_MOSTA_subset$subtype_cca_toplot[grep("fusion.mes2",merge_MOSTA_subset$subtype_cca_toplot)] <- "fusion.mes2"
+merge_MOSTA_subset$subtype_cca_toplot[grep("int.CNCC",merge_MOSTA_subset$subtype_cca_toplot)] <- "int.CNCC"
+merge_MOSTA_subset$subtype_cca_toplot[grep("MandibularArch",merge_MOSTA_subset$subtype_cca_toplot)] <- "MandibularArch"
+merge_MOSTA_subset$subtype_cca_toplot[grep("MesenchymalLikeProg",merge_MOSTA_subset$subtype_cca_toplot)] <- "MesenchymalLikeProg"
+merge_MOSTA_subset$subtype_cca_toplot[grep("MesenchymalProg",merge_MOSTA_subset$subtype_cca_toplot)] <- "MesenchymalProg"
+merge_MOSTA_subset$subtype_cca_toplot[grep("MxP.surface",merge_MOSTA_subset$subtype_cca_toplot)] <- "MxP.surface"
+merge_MOSTA_subset$subtype_cca_toplot[grep("NeuralProg",merge_MOSTA_subset$subtype_cca_toplot)] <- "NeuralProg"
+merge_MOSTA_subset$subtype_cca_toplot[grep("NeuralStem",merge_MOSTA_subset$subtype_cca_toplot)] <- "NeuralStem"
+merge_MOSTA_subset$subtype_cca_toplot[grep("palatal.fusion",merge_MOSTA_subset$subtype_cca_toplot)] <- "palatal.fusion"
+merge_MOSTA_subset$subtype_cca_toplot[grep("palatalShelf",merge_MOSTA_subset$subtype_cca_toplot)] <- "palatalShelf"
+merge_MOSTA_subset$subtype_cca_toplot[grep("palate.surface",merge_MOSTA_subset$subtype_cca_toplot)] <- "palate.surface"
+merge_MOSTA_subset$subtype_cca_toplot[grep("palate.",merge_MOSTA_subset$subtype_cca_toplot)] <- "palate"
+merge_MOSTA_subset$subtype_cca_toplot[grep("Prog_",merge_MOSTA_subset$subtype_cca_toplot)] <- "Prog"
+merge_MOSTA_subset$subtype_cca_toplot[grep("schwann",merge_MOSTA_subset$subtype_cca_toplot)] <- "schwann"
+merge_MOSTA_subset$subtype_cca_toplot[grep("surface",merge_MOSTA_subset$subtype_cca_toplot)] <- "surface"
+
+
+merge_MOSTA_subset$subtype_cca_toplot <- factor(merge_MOSTA_subset$subtype_cca_toplot)
+
+# colors <- c(hue_pal()(length(levels(merge_MOSTA_subset$subtype_cca_toplot))-1),"#E4E1E3FF")
+
+colors <- DiscretePalette_scCustomize(num_colors = length(unique(merge_MOSTA_subset$subtype_cca_toplot)),
+                                      palette = "varibow")
+
+names(colors) <- levels(merge_MOSTA_subset$subtype_cca_toplot)
+SpatialDimPlot(merge_MOSTA_subset,group.by="subtype_cca_toplot",images = "image", cols = colors)
+
+colors <- c(DiscretePalette_scCustomize(num_colors = length(levels(merge_MOSTA_subset$subtype_cca_toplot))-1,
+                                      palette = "varibow"),"#E4E1E3FF")
+
+merge_MOSTA_subset$subtype_cca_toplot <- factor(merge_MOSTA_subset$subtype_cca_toplot,
+                                            levels=c(sort(levels(merge_MOSTA_subset$subtype_cca_toplot)[-which(levels(merge_MOSTA_subset$subtype_cca_toplot)=="other cell types")]),"other cell types"))
+
+names(colors) <- levels(merge_MOSTA_subset$subtype_cca_toplot)
+
+p <- SpatialDimPlot(merge_MOSTA_subset,group.by="subtype_cca_toplot",
+                    pt.size.factor = 5,image.alpha = 0.5,stroke=0.5,cols =  colors) + 
+  theme(legend.position = "right",legend.title=element_blank()) + 
+  guides(fill = guide_legend(override.aes = list(size=5),ncol=1))
+
+p
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Spatial_DSOUZA_E15_cca_selectedsubtypes_human-to-mouse_labeltransfer_SpatialDimPlot.pdf",width=8,height=6.5)
+p
+dev.off()
+```
+
+plot a new figure for each subtype in E11.5
+```{r}
+plot.list <- list()
+for (subtype in unique(as.character(merge_MOSTA_subset_E11$subtype_cca))){
+  colors <- rep("grey50",length(levels(merge_MOSTA_subset_E11$subtype_cca)))
+  names(colors) <- levels(merge_MOSTA_subset_E11$subtype_cca)
+  colors[which(names(colors)==subtype)] <- "#DE2D26"
+  
+  plot.list[[subtype]] <- SpatialDimPlot(merge_MOSTA_subset_E11,group.by="subtype_cca",images = "image",cols = colors) + 
+    NoLegend()+
+    ggtitle(subtype) +
+    theme(plot.title = element_text(hjust = 0.5))
+}
+
+for(subtype in unique(as.character(mouse_spatial1$subtype_cca))){
+  print(plot.list[[subtype]])
+}
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Spatial_MOSTA_E11_cca_celltype_human-to-mouse_labeltransfer_SpatialDimPlot_highlightedCelltypes.pdf",width=28,height=28)
+cowplot::plot_grid(plotlist = plot.list,ncol=8,nrow = 9)
+dev.off()
+
+```
+
+plot a figure for each celltype in E15
+```{r}
+plot.list <- list()
+for (celltype in levels(mouse_spatial1_subset$celltype_cca)){
+  if (length(which(mouse_spatial1_subset$celltype_cca==celltype))>0){
+    plot.list[[celltype]] <- SpatialDimPlot(mouse_spatial1_subset,pt.size.factor = 5,image.alpha = 0.5,stroke=0.5,
+                                            cells.highlight=list(which(mouse_spatial1_subset$celltype_cca==celltype))) + 
+      NoLegend()+
+      ggtitle(celltype) +
+      theme(plot.title = element_text(hjust = 0.5))
+  } else{
+    plot.list[[celltype]] <- SpatialDimPlot(mouse_spatial1_subset,pt.size.factor = 5,image.alpha = 0.5,stroke=0.5,
+                                            cells.highlight=list(which(mouse_spatial1_subset$celltype_cca==celltype)),
+                                            cols.highlight = "grey50") + 
+      NoLegend()+
+      ggtitle(celltype) +
+      theme(plot.title = element_text(hjust = 0.5))
+  }
+}
+
+for(celltype in levels(mouse_spatial1$celltype_cca)){
+  print(plot.list[[celltype]])
+}
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Spatial_DSOUZA_E15_cca_celltype_human-to-mouse_labeltransfer_SpatialDimPlot_highlightedMainCelltypes.pdf",width=12,height=6)
+cowplot::plot_grid(plotlist = plot.list,ncol=4,nrow = 2)
+dev.off()
+
+```
+
+
+plot CNCC markers for E11.5
+```{r}
+obj.list <- readRDS("MOSTA_mouseE11.5_sobj.rds")
+
+CNCC_markers <- c("Nr2f2","Pax3","Tfap2a","Tfap2b","Alx4","Crabp1","Hand2","Nkx2-1")
+  
+plot.list <- list()
+for (gene in c(CNCC_markers)){
+p1_1 <- SpatialFeaturePlot(obj.list[[1]], features = gene) + ggtitle("Slice1") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5)) 
+
+p2_1 <- SpatialFeaturePlot(obj.list[[2]], features = gene) + ggtitle("Slice2") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5)) 
+
+p3_1 <- SpatialFeaturePlot(obj.list[[3]], features = gene) + ggtitle("Slice3") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5)) 
+
+
+plot.list[[gene]] <- list(p1_1,p2_1,p3_1)
+}
+
+for (i in names(plot.list)){
+  print(plot.list[[i]][[1]]+plot.list[[i]][[2]]+plot.list[[i]][[3]])
+}
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_SpatialExpression_CNCCMarkerGenes.pdf",width=6,height=24)
+cowplot::plot_grid(plot.list[[1]][[1]],plot.list[[1]][[2]],plot.list[[1]][[3]],
+                   plot.list[[2]][[1]],plot.list[[2]][[2]],plot.list[[2]][[3]],
+                   plot.list[[3]][[1]],plot.list[[3]][[2]],plot.list[[3]][[3]],
+                   plot.list[[4]][[1]],plot.list[[4]][[2]],plot.list[[4]][[3]],
+                   plot.list[[5]][[1]],plot.list[[5]][[2]],plot.list[[5]][[3]],
+                   plot.list[[6]][[1]],plot.list[[6]][[2]],plot.list[[6]][[3]],
+                   plot.list[[7]][[1]],plot.list[[7]][[2]],plot.list[[7]][[3]],
+                   plot.list[[8]][[1]],plot.list[[8]][[2]],plot.list[[8]][[3]],
+                   ncol=3,nrow = 8)
+dev.off()
+
+```
+
+plot main cell type module scores for E11.5
+```{r}
+plot.list <- list()
+for (i in 1:length(obj.list)){
+obj.list[[i]] <- AddModuleScore(obj.list[[i]], list(mouse_sox10pos$gene), name = "SOX2-_SOX10+_ModuleScore")
+obj.list[[i]] <- AddModuleScore(obj.list[[i]], list(mouse_ectoderm$gene), name = "Ectoderm_ModuleScore")
+obj.list[[i]] <- AddModuleScore(obj.list[[i]], list(mouse_endothelium$gene), name = "Endothelium_ModuleScore")
+obj.list[[i]] <- AddModuleScore(obj.list[[i]], list(mouse_muscle$gene), name = "Muscle_ModuleScore")
+obj.list[[i]] <- AddModuleScore(obj.list[[i]], list(mouse_mesenchyme$gene), name = "Mesenchyme_ModuleScore")
+obj.list[[i]] <- AddModuleScore(obj.list[[i]], list(mouse_eryth$gene), name = "Erythrocytes_ModuleScore")
+obj.list[[i]] <- AddModuleScore(obj.list[[i]], list(mouse_immune$gene), name = "Immune_ModuleScore")
+
+
+p1_1 <- SpatialFeaturePlot(obj.list[[i]], features = "Mesenchyme_ModuleScore1") +
+  theme(legend.position = "right")
+
+p2_1 <- SpatialFeaturePlot(obj.list[[i]], features = "SOX2-_SOX10+_ModuleScore1",images = "image") +
+  theme(legend.position = "right")
+
+p3_1 <- SpatialFeaturePlot(obj.list[[i]], features = "Ectoderm_ModuleScore1",images = "image") +
+  theme(legend.position = "right")
+
+p4_1 <- SpatialFeaturePlot(obj.list[[i]], features = "Muscle_ModuleScore1",images = "image") +
+  theme(legend.position = "right")
+
+p5_1 <- SpatialFeaturePlot(obj.list[[i]], features = "Endothelium_ModuleScore1",images = "image") +
+  theme(legend.position = "right")
+
+p6_1 <- SpatialFeaturePlot(obj.list[[i]], features = "Erythrocytes_ModuleScore1",images = "image") + 
+  theme(legend.position = "right")
+
+
+p7_1 <- SpatialFeaturePlot(obj.list[[i]], features = "Immune_ModuleScore1",images = "image") + 
+  theme(legend.position = "right")
+
+
+plot.list[[i]] <- list(p1_1,p2_1,p3_1,p4_1,p5_1,p6_1,p7_1)
+}
+
+```
+
+```{r}
+plot.list[[1]][[1]]+plot.list[[2]][[1]]+plot.list[[3]][[1]]
+plot.list[[1]][[2]]+plot.list[[2]][[2]]+plot.list[[3]][[2]]
+plot.list[[1]][[3]]+plot.list[[2]][[3]]+plot.list[[3]][[3]]
+plot.list[[1]][[4]]+plot.list[[2]][[4]]+plot.list[[3]][[4]]
+plot.list[[1]][[5]]+plot.list[[2]][[5]]+plot.list[[3]][[5]]
+plot.list[[1]][[6]]+plot.list[[2]][[6]]+plot.list[[3]][[6]]
+plot.list[[1]][[7]]+plot.list[[2]][[7]]+plot.list[[3]][[7]]
+
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_SpatialExpression_MainCellTypes_ModuleScores_SpatialFeaturePlots.pdf", h = 8.5, w = 16)
+plot.list[[1]][[1]]+plot.list[[2]][[1]]+plot.list[[3]][[1]]
+plot.list[[1]][[2]]+plot.list[[2]][[2]]+plot.list[[3]][[2]]
+plot.list[[1]][[3]]+plot.list[[2]][[3]]+plot.list[[3]][[3]]
+plot.list[[1]][[4]]+plot.list[[2]][[4]]+plot.list[[3]][[4]]
+plot.list[[1]][[5]]+plot.list[[2]][[5]]+plot.list[[3]][[5]]
+plot.list[[1]][[6]]+plot.list[[2]][[6]]+plot.list[[3]][[6]]
+plot.list[[1]][[7]]+plot.list[[2]][[7]]+plot.list[[3]][[7]]
+dev.off()
+```
+
+
+genes for module scores
+```{r}
+mouse_mes_subtype_markers$biotype <- annotLookup$gene_biotype[match(mouse_mes_subtype_markers$mo_gene,annotLookup$mgi_symbol)]
+mouse_mes_subtype_markers <- subset(mouse_mes_subtype_markers, biotype == "protein_coding")
+top100_mes <- mouse_mes_subtype_markers %>% filter(p_val_adj<0.05) %>% group_by(cluster) %>% top_n(100, avg_log2FC)
+top100pval_mes <- subset(top100_mes, rowSums(top100_mes[5] < 0.05) > 0)
+
+mouse_ect_subtype_markers$biotype <- annotLookup$gene_biotype[match(mouse_ect_subtype_markers$mo_gene,annotLookup$mgi_symbol)]
+mouse_ect_subtype_markers <- subset(mouse_ect_subtype_markers, biotype == "protein_coding")
+top100_ect <- mouse_ect_subtype_markers %>% filter(p_val_adj<0.05) %>% group_by(cluster) %>% top_n(100, avg_log2FC)
+top100pval_ect <- subset(top100_ect, rowSums(top100_ect[5] < 0.05) > 0)
+
+mouse_genename_lookup <- orthogene::convert_orthologs(rownames(cds),input_species="mouse",output_species = "human",non121_strategy = "drop_both_species", method="gprofiler") 
+
+mouse_sox10pos_subtype_markers$mo_gene <- mouse_genename_lookup$input_gene[match(mouse_sox10pos_subtype_markers$gene,rownames(mouse_genename_lookup))]
+mouse_sox10pos_subtype_markers$biotype <- annotLookup$gene_biotype[match(mouse_sox10pos_subtype_markers$mo_gene,annotLookup$mgi_symbol)]
+mouse_sox10pos_subtype_markers <- subset(mouse_sox10pos_subtype_markers, biotype == "protein_coding")
+top100_sox10pos <- mouse_sox10pos_subtype_markers %>% filter(p_val_adj<0.05) %>% group_by(cluster) %>% top_n(100, avg_log2FC)
+top100pval_sox10pos <- subset(top100_sox10pos, rowSums(top100_sox10pos[5] < 0.05) > 0)
+
+
+```
+
+plot CNCC module scores on E11.5 
+```{r}
+sox10pos_subtype_genelists <- split(top100pval_sox10pos$mo_gene,top100pval_sox10pos$cluster)
+
+for (i in 1:length(obj.list)){
+  for (n in names(sox10pos_subtype_genelists)){
+    obj.list[[i]] <- AddModuleScore(obj.list[[i]],
+                                    list(sox10pos_subtype_genelists[[n]]), name = n)
+      obj.list[[i]][[n]] <- obj.list[[i]][[paste0(n,"1")]]
+  }
+}
+
+plot.list <- list()
+for (n in names(sox10pos_subtype_genelists)) {
+  p1 <- SpatialFeaturePlot(obj.list[[1]], features = n)+ ggtitle("Slice1") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5))
+  
+  p2 <- SpatialFeaturePlot(obj.list[[2]], features = n) + ggtitle("Slice2") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5))
+  
+  p3 <- SpatialFeaturePlot(obj.list[[3]], features = n) + ggtitle("Slice3") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5))
+  print(p1 + p2 + p3)
+  
+  plot.list[[n]] <- list(p1,p2,p3)
+}
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_SpatialExpression_CNCC_Subtypes_ModuleScores_SpatialFeaturePlots.pdf",width=8,height=30)
+cowplot::plot_grid(plot.list[[1]][[1]],plot.list[[1]][[2]],plot.list[[1]][[3]],
+                   plot.list[[2]][[1]],plot.list[[2]][[2]],plot.list[[2]][[3]],
+                   plot.list[[3]][[1]],plot.list[[3]][[2]],plot.list[[3]][[3]],
+                   plot.list[[4]][[1]],plot.list[[4]][[2]],plot.list[[4]][[3]],
+                   plot.list[[5]][[1]],plot.list[[5]][[2]],plot.list[[5]][[3]],
+                   plot.list[[6]][[1]],plot.list[[6]][[2]],plot.list[[6]][[3]],
+                   plot.list[[7]][[1]],plot.list[[7]][[2]],plot.list[[7]][[3]],
+                   plot.list[[8]][[1]],plot.list[[8]][[2]],plot.list[[8]][[3]],
+                   plot.list[[9]][[1]],plot.list[[9]][[2]],plot.list[[9]][[3]],
+                   plot.list[[10]][[1]],plot.list[[10]][[2]],plot.list[[10]][[3]],
+                   plot.list[[11]][[1]],plot.list[[11]][[2]],plot.list[[11]][[3]],
+                   ncol=3,nrow = 11)
+dev.off()
+```
+
+plot ect subtype module scores on E11.5
+```{r}
+ect_subtype_genelists <- split(top100pval_ect$mo_gene,top100pval_ect$cluster)
+
+for (i in 1:length(obj.list)){
+  for (n in names(ect_subtype_genelists)){
+    obj.list[[i]] <- AddModuleScore(obj.list[[i]],
+                                    list(ect_subtype_genelists[[n]]), name = n)
+      obj.list[[i]][[n]] <- obj.list[[i]][[paste0(n,"1")]]
+  }
+}
+
+plot.list <- list()
+for (n in names(ect_subtype_genelists)) {
+  p1 <- SpatialFeaturePlot(obj.list[[1]], features = n)+ ggtitle("Slice1") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5))
+  
+  p2 <- SpatialFeaturePlot(obj.list[[2]], features = n) + ggtitle("Slice2") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5))
+  
+  p3 <- SpatialFeaturePlot(obj.list[[3]], features = n) + ggtitle("Slice3") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5))
+  
+  plot.list[[n]] <- list(p1,p2,p3)
+  
+  print(p1 + p2 + p3)
+}
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_SpatialExpression_Ect_Subtypes_ModuleScores_SpatialFeaturePlots.pdf",width=24,height=18)
+cowplot::plot_grid(plot.list[[1]][[1]],plot.list[[1]][[2]],plot.list[[1]][[3]],NULL,
+                   plot.list[[2]][[1]],plot.list[[2]][[2]],plot.list[[2]][[3]],NULL,
+                   plot.list[[3]][[1]],plot.list[[3]][[2]],plot.list[[3]][[3]],
+                   plot.list[[4]][[1]],plot.list[[4]][[2]],plot.list[[4]][[3]],NULL,
+                   plot.list[[5]][[1]],plot.list[[5]][[2]],plot.list[[5]][[3]],NULL,
+                   plot.list[[6]][[1]],plot.list[[6]][[2]],plot.list[[6]][[3]],
+                   plot.list[[7]][[1]],plot.list[[7]][[2]],plot.list[[7]][[3]],NULL,
+                   plot.list[[8]][[1]],plot.list[[8]][[2]],plot.list[[8]][[3]],NULL,
+                   plot.list[[9]][[1]],plot.list[[9]][[2]],plot.list[[9]][[3]],
+                   plot.list[[10]][[1]],plot.list[[10]][[2]],plot.list[[10]][[3]],NULL,
+                   plot.list[[11]][[1]],plot.list[[11]][[2]],plot.list[[11]][[3]],NULL,
+                   plot.list[[12]][[1]],plot.list[[12]][[2]],plot.list[[12]][[3]],
+                   plot.list[[13]][[1]],plot.list[[13]][[2]],plot.list[[13]][[3]],NULL,
+                   plot.list[[14]][[1]],plot.list[[14]][[2]],plot.list[[14]][[3]],NULL,
+                   plot.list[[15]][[1]],plot.list[[15]][[2]],plot.list[[15]][[3]],
+                   plot.list[[16]][[1]],plot.list[[16]][[2]],plot.list[[16]][[3]],NULL,
+                   plot.list[[17]][[1]],plot.list[[17]][[2]],plot.list[[17]][[3]],NULL,
+                   plot.list[[18]][[1]],plot.list[[18]][[2]],plot.list[[18]][[3]],
+                   plot.list[[19]][[1]],plot.list[[19]][[2]],plot.list[[19]][[3]],
+                   ncol=11,nrow = 7,rel_widths = c(1, 1, 1, 0.2, 1, 1, 1, 0.2, 1, 1, 1) )
+dev.off()
+```
+
+plot known ect markers on E11.5
+```{r}
+ect_markers <- c("Grhl2","Esrp1","Trp63","Irf6","Tfap2a","Tfap2b")
+  
+plot.list <- list()
+for (gene in c(ect_markers)){
+p1_1 <- SpatialFeaturePlot(obj.list[[1]], features = gene) + ggtitle("Slice1") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5)) 
+
+p2_1 <- SpatialFeaturePlot(obj.list[[2]], features = gene) + ggtitle("Slice2") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5)) 
+
+p3_1 <- SpatialFeaturePlot(obj.list[[3]], features = gene) + ggtitle("Slice3") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5)) 
+
+
+plot.list[[gene]] <- list(p1_1,p2_1,p3_1)
+}
+
+for (i in names(plot.list)){
+  print(plot.list[[i]][[1]]+plot.list[[i]][[2]]+plot.list[[i]][[3]])
+}
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_SpatialExpression_EctMarkerGenes.pdf",width=18,height=6)
+cowplot::plot_grid(plot.list[[1]][[1]],plot.list[[1]][[2]],plot.list[[1]][[3]],NULL,
+                   plot.list[[2]][[1]],plot.list[[2]][[2]],plot.list[[2]][[3]],NULL,
+                   plot.list[[3]][[1]],plot.list[[3]][[2]],plot.list[[3]][[3]],
+                   plot.list[[4]][[1]],plot.list[[4]][[2]],plot.list[[4]][[3]],NULL,
+                   plot.list[[5]][[1]],plot.list[[5]][[2]],plot.list[[5]][[3]],NULL,
+                   plot.list[[6]][[1]],plot.list[[6]][[2]],plot.list[[6]][[3]],
+                   ncol=11,nrow = 2)
+dev.off()
+
+```
+
+plot mes subtype module scores on E11.5
+```{r}
+mes_subtype_genelists <- split(top100pval_mes$mo_gene,top100pval_mes$cluster)
+
+for (i in 1:length(obj.list)){
+  for (n in names(mes_subtype_genelists)){
+    obj.list[[i]] <- AddModuleScore(obj.list[[i]],
+                                    list(mes_subtype_genelists[[n]]), name = n)
+      obj.list[[i]][[n]] <- obj.list[[i]][[paste0(n,"1")]]
+  }
+}
+
+plot.list <- list()
+for (n in names(mes_subtype_genelists)) {
+  p1 <- SpatialFeaturePlot(obj.list[[1]], features = n)+ ggtitle("Slice1") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5))
+  
+  p2 <- SpatialFeaturePlot(obj.list[[2]], features = n) + ggtitle("Slice2") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5))
+  
+  p3 <- SpatialFeaturePlot(obj.list[[3]], features = n) + ggtitle("Slice3") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5))
+  
+  plot.list[[n]] <- list(p1,p2,p3)
+  
+  print(p1 + p2 + p3)
+}
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_SpatialExpression_Mes_Subtypes_ModuleScores_SpatialFeaturePlots.pdf",width=24,height=18)
+cowplot::plot_grid(plot.list[[1]][[1]],plot.list[[1]][[2]],plot.list[[1]][[3]],NULL,
+                   plot.list[[2]][[1]],plot.list[[2]][[2]],plot.list[[2]][[3]],NULL,
+                   plot.list[[3]][[1]],plot.list[[3]][[2]],plot.list[[3]][[3]],
+                   plot.list[[4]][[1]],plot.list[[4]][[2]],plot.list[[4]][[3]],NULL,
+                   plot.list[[5]][[1]],plot.list[[5]][[2]],plot.list[[5]][[3]],NULL,
+                   plot.list[[6]][[1]],plot.list[[6]][[2]],plot.list[[6]][[3]],
+                   plot.list[[7]][[1]],plot.list[[7]][[2]],plot.list[[7]][[3]],NULL,
+                   plot.list[[8]][[1]],plot.list[[8]][[2]],plot.list[[8]][[3]],NULL,
+                   plot.list[[9]][[1]],plot.list[[9]][[2]],plot.list[[9]][[3]],
+                   plot.list[[10]][[1]],plot.list[[10]][[2]],plot.list[[10]][[3]],NULL,
+                   plot.list[[11]][[1]],plot.list[[11]][[2]],plot.list[[11]][[3]],NULL,
+                   plot.list[[12]][[1]],plot.list[[12]][[2]],plot.list[[12]][[3]],
+                   plot.list[[13]][[1]],plot.list[[13]][[2]],plot.list[[13]][[3]],NULL,
+                   plot.list[[14]][[1]],plot.list[[14]][[2]],plot.list[[14]][[3]],NULL,
+                   plot.list[[15]][[1]],plot.list[[15]][[2]],plot.list[[15]][[3]],
+                   plot.list[[16]][[1]],plot.list[[16]][[2]],plot.list[[16]][[3]],NULL,
+                   plot.list[[17]][[1]],plot.list[[17]][[2]],plot.list[[17]][[3]],NULL,
+                   plot.list[[18]][[1]],plot.list[[18]][[2]],plot.list[[18]][[3]],
+                   plot.list[[19]][[1]],plot.list[[19]][[2]],plot.list[[19]][[3]],
+                   ncol=11,nrow = 7,rel_widths = c(1, 1, 1, 0.2, 1, 1, 1, 0.2, 1, 1, 1) )
+dev.off()
+```
+
+```{r}
+mes_markers <- c("Pdgfra","Twist1","Prrx1","Alx1","Slit3","Ebf1","Ebf3","Zeb1")
+  
+plot.list <- list()
+for (gene in c(mes_markers)){
+p1_1 <- SpatialFeaturePlot(obj.list[[1]], features = gene) + ggtitle("Slice1") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5)) 
+
+p2_1 <- SpatialFeaturePlot(obj.list[[2]], features = gene) + ggtitle("Slice2") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5)) 
+
+p3_1 <- SpatialFeaturePlot(obj.list[[3]], features = gene) + ggtitle("Slice3") +
+    theme(legend.position = "bottom",plot.title = element_text(hjust=0.5)) 
+
+
+plot.list[[gene]] <- list(p1_1,p2_1,p3_1)
+}
+
+for (i in names(plot.list)){
+  print(plot.list[[i]][[1]]+plot.list[[i]][[2]]+plot.list[[i]][[3]])
+}
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_SpatialExpression_MesMarkerGenes.pdf",width=18,height=8)
+cowplot::plot_grid(plot.list[[1]][[1]],plot.list[[1]][[2]],plot.list[[1]][[3]],NULL,
+                   plot.list[[2]][[1]],plot.list[[2]][[2]],plot.list[[2]][[3]],NULL,
+                   plot.list[[3]][[1]],plot.list[[3]][[2]],plot.list[[3]][[3]],
+                   plot.list[[4]][[1]],plot.list[[4]][[2]],plot.list[[4]][[3]],NULL,
+                   plot.list[[5]][[1]],plot.list[[5]][[2]],plot.list[[5]][[3]],NULL,
+                   plot.list[[6]][[1]],plot.list[[6]][[2]],plot.list[[6]][[3]],
+                   plot.list[[7]][[1]],plot.list[[7]][[2]],plot.list[[7]][[3]],NULL,
+                   plot.list[[8]][[1]],plot.list[[8]][[2]],plot.list[[8]][[3]],
+                   ncol=11,nrow = 3,rel_widths = c(1, 1, 1, 0.2, 1, 1, 1, 0.2, 1, 1, 1))
+dev.off()
+
+```
+
+
+
+plot ebf genes on E11.5
+```{r}
+  p1 <- SpatialFeaturePlot(obj.list[[1]], features = "Ebf2")+ ggtitle("Slice1") +
+  theme(legend.position = "bottom",plot.title = element_text(hjust = 0.5,size=14))
+  
+  p2 <- SpatialFeaturePlot(obj.list[[2]], features = "Ebf2")+ ggtitle("Slice2") +
+  theme(legend.position = "bottom",plot.title = element_text(hjust = 0.5,size=14))
+  
+    p3 <- SpatialFeaturePlot(obj.list[[3]], features = "Ebf2")+ ggtitle("Slice3") +
+  theme(legend.position = "bottom",plot.title = element_text(hjust = 0.5,size=14))
+
+  p4 <- SpatialFeaturePlot(obj.list[[1]], features = "Ebf3")+ ggtitle("Slice1") +
+  theme(legend.position = "bottom",plot.title = element_text(hjust = 0.5,size=14))
+  
+  p5 <- SpatialFeaturePlot(obj.list[[2]], features = "Ebf3")+ ggtitle("Slice2") +
+  theme(legend.position = "bottom",plot.title = element_text(hjust = 0.5,size=14))
+  
+    p6 <- SpatialFeaturePlot(obj.list[[3]], features = "Ebf3")+ ggtitle("Slice3") +
+  theme(legend.position = "bottom",plot.title = element_text(hjust = 0.5,size=14))
+
+p1+p2+p3
+p4+p5+p6
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_EBF_SpatialExpression.pdf",width=8,height=5)
+cowplot::plot_grid(p1,p2,p3,p4,p5,p6,nrow=2,ncol=3)
+dev.off()
+```
+
+

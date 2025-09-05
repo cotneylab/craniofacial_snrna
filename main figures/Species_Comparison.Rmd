@@ -1,0 +1,1321 @@
+---
+title: "Species_Comparison"
+output: html_document
+date: "2025-04-09"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "/scr1/users/manchela/Data") 
+library(Seurat)
+library(SeuratDisk)
+library(tidyverse)
+library(harmony)
+library(dplyr)
+library(patchwork)
+library(viridis)
+library(ggforce)
+library(gghalves)
+library(ggridges)
+library(scCustomize)
+library(SCpubr)
+library(dplyr)
+library(DropletUtils)
+library(biomaRt)
+library(limma)
+library(pheatmap)
+library(grid)
+library(openxlsx)
+library(clusterProfiler)
+library(enrichplot)
+library(org.Hs.eg.db)
+library(AnnotationHub)
+library(ReactomePA)
+library(DOSE)
+library(orthogene)
+library(factoextra)
+library(smerc)
+library(Rfast)
+library(GeneOverlap)
+library(reshape2)
+library(RColorBrewer)
+library(DESeq2)
+library(EnhancedVolcano)
+```
+
+read in human and mouse main cell type DEGs
+```{r}
+human_sig_genes_celltype <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/SigGenes_No-Neuro_Main_Celltypes.xlsx")
+mouse_celltype_markers <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/Mouse_SigGenes_E10toE15_MainCellTypes.xlsx")
+```
+
+load in human and mouse scRNAseq objects
+```{r}
+mouse_scRNAseq <- readRDS("face_mouse_final.rds")
+# mouse_scRNAseq$celltype_final <- as.character(mouse_scRNAseq$cell_type1)
+# mouse_scRNAseq$celltype_final[which(mouse_scRNAseq$celltype_final=="red blood cells")] <- "erythrocytes"
+# mouse_scRNAseq$celltype_final[which(mouse_scRNAseq$celltype_final=="other blood cells")] <- "immune"
+# mouse_scRNAseq$celltype_final[which(mouse_scRNAseq$celltype_final=="CNCC")] <- "SOX2-_SOX10+"
+# mouse_scRNAseq$celltype_final <- factor(mouse_scRNAseq$celltype_final,levels = c("mesenchyme","ectoderm","muscle","erythrocytes","endothelium","SOX2-_SOX10+","immune"))
+
+initial.filt_singlet_noneuro <- readRDS("human_face_no-neuro_clustering_cellrangerARC-raw_emptyDrops_singlets_finalannot_27Mar.rds")
+```
+
+
+load in human and mouse mesenchyme objects
+```{r}
+human_mes <- readRDS("human_face_mes_cellrangerARC-raw_emptyDrops_singlets_8Apr.rds")
+mouse_mes <- readRDS("mmes_final.rds")
+```
+
+get one-to-one orthologs
+```{r}
+mouse_genename_lookup <- orthogene::convert_orthologs(rownames(mouse_scRNAseq),input_species="mouse",output_species = "human",non121_strategy = "drop_both_species", method="gprofiler") 
+
+
+# match with mouse one-to-one orthologs
+sig_genes_celltype_mouseOverlap <- human_sig_genes_celltype[which(human_sig_genes_celltype$gene %in% rownames(mouse_genename_lookup)),]
+
+# get marker genes for each human celltype cluster
+human_celltype_marker_genes <- sig_genes_celltype_mouseOverlap %>% filter(p_val_adj<0.05) %>% split(.$cluster) %>% lapply(function(df) df$gene)
+
+
+mouse_celltype_markers$hs_gene <- rownames(mouse_genename_lookup)[match(mouse_celltype_markers$gene,mouse_genename_lookup$input_gene)]
+
+# get marker genes for each mouse celltype cluster
+mouse_celltype_marker_genes <- mouse_celltype_markers %>% filter(p_val_adj<0.05) %>% split(.$cluster) %>% lapply(function(df) df$hs_gene)
+
+
+
+```
+
+GeneOverlap for human and mouse main celltypes
+
+```{r}
+
+gs.markers= length(intersect(rownames(mouse_genename_lookup),human_sig_genes_celltype$gene))
+
+names(human_celltype_marker_genes) <- paste0("human ",names(human_celltype_marker_genes))
+names(mouse_celltype_marker_genes) <- paste0("mouse ",names(mouse_celltype_marker_genes))
+
+gom.obj <- newGOM(human_celltype_marker_genes, mouse_celltype_marker_genes, gs.markers)
+
+# drawHeatmap(gom.obj, grid.col="Reds",note.col="white")
+
+
+celltype_geneoverlap_pval <- getMatrix(gom.obj,name = "pval")
+# celltype_geneoverlap_pval <- t(apply(celltype_geneoverlap_pval,1,function(x) p.adjust(x, method = "BH")))
+# celltype_geneoverlap_pval <- -log(celltype_geneoverlap_pval,10)
+celltype_geneoverlap_odds <- getMatrix(gom.obj,name = "odds.ratio")
+formatted_values <- t(apply(celltype_geneoverlap_pval,1,function(x) ifelse(as.numeric(x) > 0.05, "NS", sprintf("%.2e", x))))
+
+
+
+p <- pheatmap(
+  mat = celltype_geneoverlap_odds,
+  cluster_cols = F,
+  cluster_rows = F,
+  display_numbers = formatted_values,
+  number_color = ifelse(celltype_geneoverlap_odds>4,"white","black"),
+  fontsize_row = 13,
+  fontsize_col = 13,fontsize = 12,
+  angle_col = 45,
+  color = brewer.pal(9, "Reds"),
+  main = "Human vs. Mouse Celltype DEGs",
+)
+
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))
+p
+grid.text("Mouse Celltypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human Celltypes", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+
+p1 <- pheatmap(
+  mat = celltype_geneoverlap_odds[-which(rownames(celltype_geneoverlap_odds)=="human SOX2+_SOX10-"),],
+  cluster_cols = F,
+  cluster_rows = F,
+  display_numbers = formatted_values[-which(rownames(celltype_geneoverlap_odds)=="human SOX2+_SOX10-"),],
+  number_color = ifelse(celltype_geneoverlap_odds[-which(rownames(celltype_geneoverlap_odds)=="human SOX2+_SOX10-"),]>4,"white","black"),
+  fontsize_row = 13,
+  fontsize_col = 13,fontsize = 12,
+  angle_col = 45,
+  color = brewer.pal(9, "Reds"),
+  main = "Human vs. Mouse Celltype DEGs",
+)
+
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))
+p1
+grid.text("Mouse Celltypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human Celltypes", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Final_No-Neuro_Celltype_GeneOverlap_human_mouse_allDEGs_heatmap.pdf",width=11,height=8.5)
+
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))
+p
+grid.text("Mouse Celltypes", y = -0.02, gp = gpar(fontsize = 16)) # X-axis title
+grid.text("Human Celltypes", x = -0.02, rot = 90, gp = gpar(fontsize = 16)) # Y-axis title
+
+drawHeatmap(gom.obj, grid.col="Reds",note.col="white")
+
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))
+p1
+grid.text("Mouse Celltypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human Celltypes", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+dev.off()
+```
+
+get conserved DEGs between human and mouse main cell types
+```{r}
+conserved_genes <- getNestedList(gom.obj, name="intersection")
+conserved_genelist <- list("Mesenchyme" = conserved_genes$`mouse mesenchyme`$`human mesenchyme`, "CNCC" = conserved_genes$`mouse SOX2-_SOX10+`$`human SOX2-_SOX10+`, "Ectoderm" = conserved_genes$`mouse ectoderm`$`human ectoderm`, "Muscle" = conserved_genes$`mouse muscle`$`human muscle`, "Erythrocytes" = conserved_genes$`mouse erythrocytes`$`human erythrocytes`, "Immune" = conserved_genes$`mouse immune`$`human immune`)
+
+#openxlsx::write.xlsx(conserved_genelist, file = "Craniofacial-scRNAseqManuscript/final-tables/human_mouse_conserved_marker_genes.xlsx", sheetName = names(conserved_genelist), rowNames = FALSE)
+
+```
+
+
+```{r}
+mart <-  useMart("ENSEMBL_MART_ENSEMBL") #, host = "https://useast.ensembl.org")
+mart <- useDataset("hsapiens_gene_ensembl", mart)
+annotLookup <- getBM(
+  mart = mart,
+  attributes = c(
+    "hgnc_symbol","description",
+    "entrezgene_id",
+    "gene_biotype"),
+  filter = "hgnc_symbol",
+  values = rownames(initial.filt_singlet_noneuro),
+  uniqueRows=TRUE)
+
+mouse_celltype_markers$Entrez <- annotLookup$entrezgene_id[match(mouse_celltype_markers$hs_gene,annotLookup$hgnc_symbol)]
+mouse_celltype_markers <- mouse_celltype_markers[-which(is.na(mouse_celltype_markers$Entrez)),]
+```
+
+make lists of marker genes for mouse and human main cell types
+```{r}
+#make list of marker genes
+human_mesenchyme <- subset(human_sig_genes_celltype, cluster == "mesenchyme")
+human_cncc <- subset(human_sig_genes_celltype, cluster == "SOX2+_SOX10-")
+human_ectoderm <- subset(human_sig_genes_celltype, cluster == "ectoderm")
+human_muscle <- subset(human_sig_genes_celltype, cluster == "muscle")
+human_endothelium <- subset(human_sig_genes_celltype, cluster == "endothelium")
+human_blood <- subset(human_sig_genes_celltype, cluster == "erythrocytes")
+human_immune <- subset(human_sig_genes_celltype, cluster == "immune")
+
+mouse_mesenchyme <- subset(mouse_celltype_markers, cluster == "mesenchyme")
+mouse_cncc <- subset(mouse_celltype_markers, cluster == "SOX2-_SOX10+")
+mouse_ectoderm <- subset(mouse_celltype_markers, cluster == "ectoderm")
+mouse_muscle <- subset(mouse_celltype_markers, cluster == "muscle")
+mouse_endothelium <- subset(mouse_celltype_markers, cluster == "endothelium")
+mouse_blood <- subset(mouse_celltype_markers, cluster == "erythrocytes")
+mouse_immune <- subset(mouse_celltype_markers, cluster == "immune")
+
+mesenchyme_gene_list <- list("Human" = human_mesenchyme$Entrez, "Mouse" = mouse_mesenchyme$Entrez)
+cncc_gene_list <- list("Human" = human_cncc$Entrez, "Mouse" = mouse_cncc$Entrez)
+ectoderm_gene_list <- list("Human" = human_ectoderm$Entrez, "Mouse" = mouse_ectoderm$Entrez)
+muscle_gene_list <- list("Human" = human_muscle$Entrez, "Mouse" = mouse_muscle$Entrez)
+endothelium_gene_list <- list("Human" = human_endothelium$Entrez, "Mouse" = mouse_endothelium$Entrez)
+blood_gene_list <- list("Human" = human_blood$Entrez, "Mouse" = mouse_blood$Entrez)
+immune_gene_list <- list("Human" = human_immune$Entrez, "Mouse" = mouse_immune$Entrez)
+human_markers <- list("Human Mesenchyme" = human_mesenchyme$Entrez, "Human CNCC" = human_cncc$Entrez, "Human Muscle" = human_muscle$Entrez, "Human endothelium" = human_endothelium$Entrez, "Human Ectoderm" = human_ectoderm$Entrez, "Human Blood" = human_blood$Entrez, "Human Immune" = human_immune$Entrez)
+mouse_markers <- list("Mouse Mesenchyme" = mouse_mesenchyme$Entrez, "Mouse CNCC" = mouse_cncc$Entrez, "Mouse Muscle" = mouse_muscle$Entrez, "Mouse endothelium" = mouse_endothelium$Entrez, "Mouse Ectoderm" = mouse_ectoderm$Entrez, "Mouse Blood" = mouse_blood$Entrez, "Mouse Immune" = mouse_immune$Entrez)
+all_markers <- list("Human Mesenchyme" = human_mesenchyme$Entrez, "Human CNCC" = human_cncc$Entrez, "Human Muscle" = human_muscle$Entrez, "Human endothelium" = human_endothelium$Entrez, "Human Ectoderm" = human_ectoderm$Entrez, "Human Blood" = human_blood$Entrez, "Human Immune" = human_immune$Entrez, "Mouse Mesenchyme" = mouse_mesenchyme$Entrez, "Mouse CNCC" = mouse_cncc$Entrez, "Mouse Muscle" = mouse_muscle$Entrez, "Mouse endothelium" = mouse_endothelium$Entrez, "Mouse Ectoderm" = mouse_ectoderm$Entrez, "Mouse Blood" = mouse_blood$Entrez, "Mouse Immune" = mouse_immune$Entrez )
+human_marker_background <- unique(human_sig_genes_celltype$Entrez)
+
+
+human_specific_mesenchyme <- setdiff(human_mesenchyme$Entrez, conserved_genelist$Mesenchyme)
+human_specific_ectoderm <- setdiff(human_ectoderm$Entrez, conserved_genelist$Ectoderm)
+human_specific_muscle <- setdiff(human_muscle$Entrez, conserved_genelist$Muscle)
+human_specific_endothelium <- setdiff(human_immune$Entrez, conserved_genelist$Endothelium)
+human_specific_blood <- setdiff(human_blood$Entrez, conserved_genelist$Blood)
+human_specific_cncc <- setdiff(human_cncc$Entrez, conserved_genelist$CNCC)
+human_specific_immune <- setdiff(human_immune$Entrez, conserved_genelist$Immune)
+
+human_specific_genelist <- list("Mesenchyme" = human_specific_mesenchyme, "CNCC" = human_specific_cncc, "Ectoderm" = human_specific_ectoderm, "Endothelium" = human_specific_endothelium, "Muscle" = human_specific_muscle, "Blood" = human_specific_blood, "Immune" = human_specific_immune)
+
+
+mouse_specific_mesenchyme <- setdiff(mouse_mesenchyme$Entrez, conserved_genelist$Mesenchyme)
+mouse_specific_ectoderm <- setdiff(mouse_ectoderm$Entrez, conserved_genelist$Ectoderm)
+mouse_specific_muscle <- setdiff(mouse_muscle$Entrez, conserved_genelist$Muscle)
+mouse_specific_endothelium <- setdiff(mouse_immune$Entrez, conserved_genelist$Endothelium)
+mouse_specific_blood <- setdiff(mouse_blood$Entrez, conserved_genelist$Blood)
+mouse_specific_cncc <- setdiff(mouse_cncc$Entrez, conserved_genelist$CNCC)
+mouse_specific_immune <- setdiff(mouse_immune$Entrez, conserved_genelist$Immune)
+
+mouse_specific_genelist <- list("Mesenchyme" = mouse_specific_mesenchyme, "CNCC" = mouse_specific_cncc, "Ectoderm" = mouse_specific_ectoderm, "Endothelium" = mouse_specific_endothelium, "Muscle" = mouse_specific_muscle, "Blood" = mouse_specific_blood, "Immune" = mouse_specific_immune)
+```
+
+```{r}
+human_specific_mesenchyme_genes <- setdiff(human_mesenchyme$gene, conserved_genelist$Mesenchyme)
+human_specific_ectoderm_genes <- setdiff(human_ectoderm$gene, conserved_genelist$Ectoderm)
+human_specific_muscle_genes <- setdiff(human_muscle$gene, conserved_genelist$Muscle)
+human_specific_endothelium_genes <- setdiff(human_immune$gene, conserved_genelist$Endothelium)
+human_specific_blood_genes <- setdiff(human_blood$gene, conserved_genelist$Blood)
+human_specific_cncc_genes <- setdiff(human_cncc$gene, conserved_genelist$CNCC)
+human_specific_immune_genes <- setdiff(human_immune$gene, conserved_genelist$Immune)
+
+human_specific_genes <- list("Mesenchyme" = human_specific_mesenchyme_genes, "CNCC" = human_specific_cncc_genes, "Ectoderm" = human_specific_ectoderm_genes, "Endothelium" = human_specific_endothelium_genes, "Muscle" = human_specific_muscle_genes, "Blood" = human_specific_blood_genes, "Immune" = human_specific_immune_genes)
+
+#openxlsx::write.xlsx(human_specific_genes, file = "Craniofacial-scRNAseqManuscript/final-tables/human_specific_main_celltype_marker_genes.xlsx", sheetName = names(human_specific_genes), rowNames = FALSE)
+
+```
+
+```{r}
+mouse_specific_mesenchyme_genes <- setdiff(mouse_mesenchyme$hs_gene, conserved_genelist$Mesenchyme)
+mouse_specific_ectoderm_genes <- setdiff(mouse_ectoderm$hs_gene, conserved_genelist$Ectoderm)
+mouse_specific_muscle_genes <- setdiff(mouse_muscle$hs_gene, conserved_genelist$Muscle)
+mouse_specific_endothelium_genes <- setdiff(mouse_immune$hs_gene, conserved_genelist$Endothelium)
+mouse_specific_blood_genes <- setdiff(mouse_blood$hs_gene, conserved_genelist$Blood)
+mouse_specific_cncc_genes <- setdiff(mouse_cncc$hs_gene, conserved_genelist$CNCC)
+mouse_specific_immune_genes <- setdiff(mouse_immune$hs_gene, conserved_genelist$Immune)
+
+mouse_specific_genes <- list("Mesenchyme" = mouse_specific_mesenchyme_genes, "CNCC" = mouse_specific_cncc_genes, "Ectoderm" = mouse_specific_ectoderm_genes, "Endothelium" = mouse_specific_endothelium_genes, "Muscle" = mouse_specific_muscle_genes, "Blood" = mouse_specific_blood_genes, "Immune" = mouse_specific_immune_genes)
+
+#openxlsx::write.xlsx(mouse_specific_genes, file = "Craniofacial-scRNAseqManuscript/final-tables/mouse_specific_main_celltype_marker_genes.xlsx", sheetName = names(mouse_specific_genes), rowNames = FALSE)
+
+```
+
+
+functional annotation for conserved genes between human and mouse
+```{r}
+conserved_genelist_entrez <- conserved_genelist
+
+for (celltype in names(conserved_genelist)){
+  conserved_genelist_entrez[[celltype]] <- annotLookup$entrezgene_id[match(conserved_genelist[[celltype]],annotLookup$hgnc_symbol)]
+}
+
+BPclusterplot <- compareCluster(geneCluster = conserved_genelist_entrez, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'BP')
+CCclusterplot <- compareCluster(geneCluster = conserved_genelist_entrez, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'CC')
+MFclusterplot <- compareCluster(geneCluster = conserved_genelist_entrez, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'MF')
+BPclusterplot <- pairwise_termsim(BPclusterplot)
+CCclusterplot <- pairwise_termsim(CCclusterplot)
+MFclusterplot <- pairwise_termsim(MFclusterplot)
+
+Pathwayclusterplot <- compareCluster(geneCluster = conserved_genelist_entrez, fun = "enrichPathway", pvalueCutoff=0.05, pAdjustMethod = "BH", organism = "human")
+Pathwayclusterplot <- pairwise_termsim(Pathwayclusterplot)
+
+KEGGclusterplot <- compareCluster(geneCluster = conserved_genelist_entrez, fun = "enrichKEGG", pvalueCutoff=0.05, pAdjustMethod = "BH", organism = "hsa")
+KEGGclusterplot <- pairwise_termsim(KEGGclusterplot)
+
+
+DOclusterplot <- compareCluster(geneCluster = conserved_genelist_entrez, fun = "enrichDGN", pvalueCutoff=0.05, pAdjustMethod = "BH")
+DOclusterplot <- pairwise_termsim(DOclusterplot)
+
+options(enrichplot.colours = c("blue", "grey"))
+p1 <- dotplot(BPclusterplot, showCategory = 10, font.size = 6, title = "GO: Biological Process", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("orange", "grey"))
+p2 <- dotplot(CCclusterplot, showCategory = 10, font.size = 6, title = "GO: Cellular Component", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("green", "grey"))
+p3 <- dotplot(MFclusterplot, showCategory = 10, font.size = 6, title = "GO: Molecular Function", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("brown", "grey"))
+p4 <- dotplot(Pathwayclusterplot, showCategory = 10, font.size = 6, title = "Reactome Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("yellow", "grey"))
+p5 <- dotplot(KEGGclusterplot, showCategory = 10, font.size = 6, title = "KEGG Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("red", "grey"))
+p6 <- dotplot(DOclusterplot, showCategory = 10, font.size = 6, title = "DisGeNet", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+
+
+cowplot::plot_grid(p1, p2, p3, p4, p5, p6, ncol=2, labels=LETTERS[1:6])
+```
+
+
+```{r}
+pdf(file = "Craniofacial-scRNAseqManuscript/final-figs/conservation_main_cluster_enrichment_dotplot.pdf", w = 17, h = 22)
+cowplot::plot_grid(p1, p2, p3, p4, p5, p6, ncol=2, labels=LETTERS[1:6])
+dev.off()
+```
+
+
+```{r}
+human_mouse_conserved_genelist <- list(BP =BPclusterplot, CC=CCclusterplot, MF = MFclusterplot, Reactome=Pathwayclusterplot,
+                          KEGG=KEGGclusterplot, DisGeNet=DOclusterplot)
+saveRDS(human_mouse_conserved_genelist, "human_mouse_conservation_main_cluster_functional-annotation_lists.rds")
+
+
+human_mouse_conserved_genelist <- readRDS("human_mouse_conservation_main_cluster_functional-annotation_lists.rds")
+
+human_mouse_conserved_genelist$BP <- human_mouse_conserved_genelist$BP@compareClusterResult
+human_mouse_conserved_genelist$CC <- human_mouse_conserved_genelist$CC@compareClusterResult
+human_mouse_conserved_genelist$MF <- human_mouse_conserved_genelist$MF@compareClusterResult
+human_mouse_conserved_genelist$Reactome <- human_mouse_conserved_genelist$Reactome@compareClusterResult
+human_mouse_conserved_genelist$KEGG <- human_mouse_conserved_genelist$KEGG@compareClusterResult
+human_mouse_conserved_genelist$DisGeNet <- human_mouse_conserved_genelist$DisGeNet@compareClusterResult
+openxlsx::write.xlsx(human_mouse_conserved_genelist, file = "Craniofacial-scRNAseqManuscript/final-tables/human_mouse_conservation_main_cluster_functional-annotation.xlsx",
+                     sheetName = names(human_mouse_conserved_genelist), rowNames = FALSE)
+
+```
+
+functional annotation for human-specific genes
+```{r}
+BPclusterplot <- compareCluster(geneCluster = human_specific_genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'BP')
+CCclusterplot <- compareCluster(geneCluster = human_specific_genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'CC')
+MFclusterplot <- compareCluster(geneCluster = human_specific_genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'MF')
+BPclusterplot <- pairwise_termsim(BPclusterplot)
+CCclusterplot <- pairwise_termsim(CCclusterplot)
+MFclusterplot <- pairwise_termsim(MFclusterplot)
+
+Pathwayclusterplot <- compareCluster(geneCluster = human_specific_genelist, fun = "enrichPathway", pvalueCutoff=0.05, pAdjustMethod = "BH", organism = "human")
+Pathwayclusterplot <- pairwise_termsim(Pathwayclusterplot)
+
+KEGGclusterplot <- compareCluster(geneCluster = human_specific_genelist, fun = "enrichKEGG", pvalueCutoff=0.05, pAdjustMethod = "BH", organism = "hsa")
+KEGGclusterplot <- pairwise_termsim(KEGGclusterplot)
+
+
+DOclusterplot <- compareCluster(geneCluster = human_specific_genelist, fun = "enrichDGN", pvalueCutoff=0.05, pAdjustMethod = "BH")
+DOclusterplot <- pairwise_termsim(DOclusterplot)
+
+
+
+
+options(enrichplot.colours = c("blue", "grey"))
+p1 <- dotplot(BPclusterplot, showCategory = 10, font.size = 6, title = "GO: Biological Process", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("orange", "grey"))
+p2 <- dotplot(CCclusterplot, showCategory = 10, font.size = 6, title = "GO: Cellular Component", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("green", "grey"))
+p3 <- dotplot(MFclusterplot, showCategory = 10, font.size = 6, title = "GO: Molecular Function", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("brown", "grey"))
+p4 <- dotplot(Pathwayclusterplot, showCategory = 10, font.size = 6, title = "Reactome Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("yellow", "grey"))
+p5 <- dotplot(KEGGclusterplot, showCategory = 10, font.size = 6, title = "KEGG Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("red", "grey"))
+p6 <- dotplot(DOclusterplot, showCategory = 10, font.size = 6, title = "DisGeNet", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+
+
+cowplot::plot_grid(p1, p2, p3, p4, p5, p6, ncol=2, labels=LETTERS[1:6])
+```
+
+```{r}
+pdf(file = "Craniofacial-scRNAseqManuscript/final-figs/human_specific_main_cluster_enrichment_dotplot.pdf", w = 17, h = 22)
+cowplot::plot_grid(p1, p2, p3, p4, p5, p6, ncol=2, labels=LETTERS[1:6])
+dev.off()
+```
+
+```{r}
+go.ls <- human_specific_genelist %>% map(~{
+  
+  
+  
+  eGO <- enrichGO(
+    gene          = .x,
+    OrgDb         = org.Hs.eg.db,
+    ont           = "BP",
+    pAdjustMethod = "BH",
+    pvalueCutoff  = 0.05,
+    readable      = TRUE
+  )
+  
+  return(eGO)
+  
+})
+
+openxlsx::write.xlsx(go.ls, file = "Craniofacial-scRNAseqManuscript/final-tables/gene_onology_bp_human_specific_main_clusters.xlsx", sheetName = names(go.ls), rowNames = FALSE)
+
+go.ls <- human_specific_genelist %>% map(~{
+  
+  
+  
+  eGO <- enrichGO(
+    gene          = .x,
+    OrgDb         = org.Hs.eg.db,
+    ont           = "CC",
+    pAdjustMethod = "BH",
+    pvalueCutoff  = 0.05,
+    readable      = TRUE
+  )
+  
+  return(eGO)
+  
+})
+
+openxlsx::write.xlsx(go.ls, file = "Craniofacial-scRNAseqManuscript/final-tables/gene_onology_cc_human_specific_main_clusters.xlsx", sheetName = names(go.ls), rowNames = FALSE)
+
+go.ls <- human_specific_genelist %>% map(~{
+  
+  
+  
+  eGO <- enrichGO(
+    gene          = .x,
+    OrgDb         = org.Hs.eg.db,
+    ont           = "MF",
+    pAdjustMethod = "BH",
+    pvalueCutoff  = 0.05,
+    readable      = TRUE
+  )
+  
+  return(eGO)
+  
+})
+
+openxlsx::write.xlsx(go.ls, file = "Craniofacial-scRNAseqManuscript/final-tables/gene_onology_mf_human_specific_human_specific_main_clusters.xlsx", sheetName = names(go.ls), rowNames = FALSE)
+
+
+do.ls <- human_specific_genelist %>% map(~{
+  
+  
+  
+  eDO <- enrichDGN(
+    gene          = .x,
+    pAdjustMethod = "BH",
+    pvalueCutoff  = 0.05,
+    readable      = TRUE
+  )
+  
+  return(eDO)
+  
+})
+
+openxlsx::write.xlsx(do.ls, file = "Craniofacial-scRNAseqManuscript/final-tables/disease_onology_human_specific_main_clusters.xlsx", sheetName = names(do.ls), rowNames = FALSE)
+
+kegg.ls <- human_specific_genelist %>% map(~{
+  eKEGG <- enrichKEGG(
+    gene = .x,
+    pvalueCutoff = 0.05, 
+    organism = 'hsa'
+  )
+  return(eKEGG)
+})
+
+openxlsx::write.xlsx(kegg.ls, file = "Craniofacial-scRNAseqManuscript/final-tables/kegg_human_specific_main_clusters.xlsx", sheetName = names(kegg.ls), rowNames = FALSE)
+
+pathway.ls <- human_specific_genelist %>% map(~{
+  ePathway <- enrichPathway(
+    gene = .x,
+    pvalueCutoff = 0.05,
+    readable = TRUE, 
+  )
+  return(ePathway)
+})
+
+openxlsx::write.xlsx(pathway.ls, file = "Craniofacial-scRNAseqManuscript/final-tables/reactome_human_specific_main_clusters.xlsx", sheetName = names(pathway.ls), rowNames = FALSE)
+
+```
+
+functional annotation for mouse-specific genes
+```{r}
+BPclusterplot <- compareCluster(geneCluster = mouse_specific_genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'BP')
+CCclusterplot <- compareCluster(geneCluster = mouse_specific_genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'CC')
+MFclusterplot <- compareCluster(geneCluster = mouse_specific_genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'MF')
+BPclusterplot <- pairwise_termsim(BPclusterplot)
+CCclusterplot <- pairwise_termsim(CCclusterplot)
+MFclusterplot <- pairwise_termsim(MFclusterplot)
+
+Pathwayclusterplot <- compareCluster(geneCluster = mouse_specific_genelist, fun = "enrichPathway", pvalueCutoff=0.05, pAdjustMethod = "BH", organism = "human")
+Pathwayclusterplot <- pairwise_termsim(Pathwayclusterplot)
+
+KEGGclusterplot <- compareCluster(geneCluster = mouse_specific_genelist, fun = "enrichKEGG", pvalueCutoff=0.05, pAdjustMethod = "BH", organism = "hsa")
+KEGGclusterplot <- pairwise_termsim(KEGGclusterplot)
+
+
+DOclusterplot <- compareCluster(geneCluster = mouse_specific_genelist, fun = "enrichDGN", pvalueCutoff=0.05, pAdjustMethod = "BH")
+DOclusterplot <- pairwise_termsim(DOclusterplot)
+
+options(enrichplot.colours = c("blue", "grey"))
+p1 <- dotplot(BPclusterplot, showCategory = 10, font.size = 6, title = "GO: Biological Process", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("orange", "grey"))
+p2 <- dotplot(CCclusterplot, showCategory = 10, font.size = 6, title = "GO: Cellular Component", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("green", "grey"))
+p3 <- dotplot(MFclusterplot, showCategory = 10, font.size = 6, title = "GO: Molecular Function", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("brown", "grey"))
+p4 <- dotplot(Pathwayclusterplot, showCategory = 10, font.size = 6, title = "Reactome Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("yellow", "grey"))
+p5 <- dotplot(KEGGclusterplot, showCategory = 10, font.size = 6, title = "KEGG Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("red", "grey"))
+p6 <- dotplot(DOclusterplot, showCategory = 10, font.size = 6, title = "DisGeNet", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+
+
+cowplot::plot_grid(p1, p2, p3, p4, p5, p6, ncol=2, labels=LETTERS[1:6])
+```
+
+```{r}
+pdf(file = "Craniofacial-scRNAseqManuscript/final-figs/mouse_specific_main_cluster_enrichment_dotplot.pdf", w = 17, h = 22)
+cowplot::plot_grid(p1, p2, p3, p4, p5, p6, ncol=2, labels=LETTERS[1:6])
+dev.off()
+```
+
+```{r}
+go.ls <- mouse_specific_genelist %>% map(~{
+  
+  
+  
+  eGO <- enrichGO(
+    gene          = .x,
+    OrgDb         = org.Hs.eg.db,
+    ont           = "BP",
+    pAdjustMethod = "BH",
+    pvalueCutoff  = 0.05,
+    readable      = TRUE
+  )
+  
+  return(eGO)
+  
+})
+
+openxlsx::write.xlsx(go.ls, file = "Craniofacial-scRNAseqManuscript/final-tables/gene_onology_bp_mouse_specific_main_clusters.xlsx", sheetName = names(go.ls), rowNames = FALSE)
+
+go.ls <- mouse_specific_genelist %>% map(~{
+  
+  
+  
+  eGO <- enrichGO(
+    gene          = .x,
+    OrgDb         = org.Hs.eg.db,
+    ont           = "CC",
+    pAdjustMethod = "BH",
+    pvalueCutoff  = 0.05,
+    readable      = TRUE
+  )
+  
+  return(eGO)
+  
+})
+
+openxlsx::write.xlsx(go.ls, file = "Craniofacial-scRNAseqManuscript/final-tables/gene_onology_cc_mouse_specific_main_clusters.xlsx", sheetName = names(go.ls), rowNames = FALSE)
+
+go.ls <- mouse_specific_genelist %>% map(~{
+  
+  
+  
+  eGO <- enrichGO(
+    gene          = .x,
+    OrgDb         = org.Hs.eg.db,
+    ont           = "MF",
+    pAdjustMethod = "BH",
+    pvalueCutoff  = 0.05,
+    readable      = TRUE
+  )
+  
+  return(eGO)
+  
+})
+
+openxlsx::write.xlsx(go.ls, file = "Craniofacial-scRNAseqManuscript/final-tables/gene_onology_mf_mouse_specific_mouse_specific_main_clusters.xlsx", sheetName = names(go.ls), rowNames = FALSE)
+
+
+do.ls <- mouse_specific_genelist %>% map(~{
+  
+  
+  
+  eDO <- enrichDGN(
+    gene          = .x,
+    pAdjustMethod = "BH",
+    pvalueCutoff  = 0.05,
+    readable      = TRUE
+  )
+  
+  return(eDO)
+  
+})
+
+openxlsx::write.xlsx(do.ls, file = "Craniofacial-scRNAseqManuscript/final-tables/disease_onology_mouse_specific_main_clusters.xlsx", sheetName = names(do.ls), rowNames = FALSE)
+
+kegg.ls <- mouse_specific_genelist %>% map(~{
+  eKEGG <- enrichKEGG(
+    gene = .x,
+    pvalueCutoff = 0.05, 
+    organism = 'hsa'
+  )
+  return(eKEGG)
+})
+
+openxlsx::write.xlsx(kegg.ls, file = "Craniofacial-scRNAseqManuscript/final-tables/kegg_mouse_specific_main_clusters.xlsx", sheetName = names(kegg.ls), rowNames = FALSE)
+
+pathway.ls <- mouse_specific_genelist %>% map(~{
+  ePathway <- enrichPathway(
+    gene = .x,
+    pvalueCutoff = 0.05,
+    readable = TRUE, 
+  )
+  return(ePathway)
+})
+
+openxlsx::write.xlsx(pathway.ls, file = "Craniofacial-scRNAseqManuscript/final-tables/reactome_mouse_specific_main_clusters.xlsx", sheetName = names(pathway.ls), rowNames = FALSE)
+
+```
+
+create lists with human and mouse specific genes
+```{r}
+mesenchyme_comparisons_genelist <- list ("Human Specific" = human_specific_mesenchyme, "Conserved " = conserved_genelist_entrez$Mesenchyme, "Mouse Specific" = mouse_specific_mesenchyme)
+ectoderm_comparisons_genelist <- list ("Human Specific" = human_specific_ectoderm, "Conserved " = conserved_genelist_entrez$Ectoderm, "Mouse Specific" = mouse_specific_ectoderm)
+muscle_comparisons_genelist <- list ("Human Specific" = human_specific_muscle, "Conserved " = conserved_genelist_entrez$Muscle, "Mouse Specific" = mouse_specific_muscle)
+endothelium_comparisons_genelist <- list ("Human Specific" = human_specific_endothelium, "Conserved " = conserved_genelist_entrez$Endothelium, "Mouse Specific" = mouse_specific_endothelium)
+blood_comparisons_genelist <- list ("Human Specific" = human_specific_blood, "Conserved " = conserved_genelist_entrez$Blood, "Mouse Specific" = mouse_specific_blood)
+cncc_comparisons_genelist <- list ("Human Specific" = human_specific_cncc, "Conserved " = conserved_genelist_entrez$CNCC, "Mouse Specific" = mouse_specific_cncc)
+immune_comparisons_genelist <- list ("Human Specific" = human_specific_immune, "Conserved " = conserved_genelist_entrez$Immune, "Mouse Specific" = mouse_specific_immune)
+
+
+```
+
+functional annotation for human vs. mouse mesenchymal DEGs
+```{r}
+BPclusterplot <- compareCluster(geneCluster = mesenchyme_comparisons_genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'BP')
+CCclusterplot <- compareCluster(geneCluster = mesenchyme_comparisons_genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'CC')
+MFclusterplot <- compareCluster(geneCluster = mesenchyme_comparisons_genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'MF')
+BPclusterplot <- pairwise_termsim(BPclusterplot)
+CCclusterplot <- pairwise_termsim(CCclusterplot)
+MFclusterplot <- pairwise_termsim(MFclusterplot)
+
+Pathwayclusterplot <- compareCluster(geneCluster = mesenchyme_comparisons_genelist, fun = "enrichPathway", pvalueCutoff=0.05, pAdjustMethod = "BH", organism = "human")
+Pathwayclusterplot <- pairwise_termsim(Pathwayclusterplot)
+
+KEGGclusterplot <- compareCluster(geneCluster = mesenchyme_comparisons_genelist, fun = "enrichKEGG", pvalueCutoff=0.05, pAdjustMethod = "BH", organism = "hsa")
+KEGGclusterplot <- pairwise_termsim(KEGGclusterplot)
+
+
+DOclusterplot <- compareCluster(geneCluster = mesenchyme_comparisons_genelist, fun = "enrichDGN", pvalueCutoff=0.05, pAdjustMethod = "BH")
+DOclusterplot <- pairwise_termsim(DOclusterplot)
+
+options(enrichplot.colours = c("blue", "grey"))
+p1 <- dotplot(BPclusterplot, showCategory = 20, font.size = 6, title = "GO: Biological Process", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("orange", "grey"))
+p2 <- dotplot(CCclusterplot, showCategory = 20, font.size = 6, title = "GO: Cellular Component", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("green", "grey"))
+p3 <- dotplot(MFclusterplot, showCategory = 20, font.size = 6, title = "GO: Molecular Function", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("brown", "grey"))
+p4 <- dotplot(Pathwayclusterplot, showCategory = 20, font.size = 6, title = "Reactome Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("yellow", "grey"))
+p5 <- dotplot(KEGGclusterplot, showCategory = 20, font.size = 6, title = "KEGG Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("red", "grey"))
+p6 <- dotplot(DOclusterplot, showCategory = 20, font.size = 6, title = "DisGeNet", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+
+
+cowplot::plot_grid(p1, p2, p3, p4, p5, p6, ncol=2, labels=LETTERS[1:6])
+```
+
+```{r}
+pdf(file = "Craniofacial-scRNAseqManuscript/final-figs/mesenchyme_comparison_enrichment_dotplot.pdf", w = 17, h = 22)
+cowplot::plot_grid(p1, p2, p3, p4, p5, p6, ncol=2, labels=LETTERS[1:6])
+dev.off()
+```
+
+```{r}
+mes_conserv_annot_list <- list(BP =BPclusterplot, CC=CCclusterplot, MF = MFclusterplot, Reactome=Pathwayclusterplot,
+                          KEGG=KEGGclusterplot, DisGeNet=DOclusterplot)
+saveRDS(mes_conserv_annot_list, "human_mouse_mesenchyme_conservation_final_functional-annotation_lists.rds")
+
+
+mes_conserv_annot_list <- readRDS("human_mouse_mesenchyme_conservation_final_functional-annotation_lists.rds")
+mes_conserv_annot_list$BP <- mes_conserv_annot_list$BP@compareClusterResult
+mes_conserv_annot_list$CC <- mes_conserv_annot_list$CC@compareClusterResult
+mes_conserv_annot_list$MF <- mes_conserv_annot_list$MF@compareClusterResult
+mes_conserv_annot_list$Reactome <- mes_conserv_annot_list$Reactome@compareClusterResult
+mes_conserv_annot_list$KEGG <- mes_conserv_annot_list$KEGG@compareClusterResult
+mes_conserv_annot_list$DisGeNet <- mes_conserv_annot_list$DisGeNet@compareClusterResult
+openxlsx::write.xlsx(mes_conserv_annot_list, file = "Craniofacial-scRNAseqManuscript/final-tables/human_mouse_mesenchyme_conservation_final_functional-annotation.xlsx",
+                     sheetName = names(mes_conserv_annot_list), rowNames = FALSE)
+```
+
+functional annotation for human vs. mouse CNCC DEGs
+```{r}
+BPclusterplot <- compareCluster(geneCluster = cncc_comparisons_genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'BP')
+CCclusterplot <- compareCluster(geneCluster = cncc_comparisons_genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'CC')
+MFclusterplot <- compareCluster(geneCluster = cncc_comparisons_genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'MF')
+BPclusterplot <- pairwise_termsim(BPclusterplot)
+CCclusterplot <- pairwise_termsim(CCclusterplot)
+MFclusterplot <- pairwise_termsim(MFclusterplot)
+
+Pathwayclusterplot <- compareCluster(geneCluster = cncc_comparisons_genelist, fun = "enrichPathway", pvalueCutoff=0.05, pAdjustMethod = "BH", organism = "human")
+Pathwayclusterplot <- pairwise_termsim(Pathwayclusterplot)
+
+KEGGclusterplot <- compareCluster(geneCluster = cncc_comparisons_genelist, fun = "enrichKEGG", pvalueCutoff=0.05, pAdjustMethod = "BH", organism = "hsa")
+KEGGclusterplot <- pairwise_termsim(KEGGclusterplot)
+
+
+DOclusterplot <- compareCluster(geneCluster = cncc_comparisons_genelist, fun = "enrichDGN", pvalueCutoff=0.05, pAdjustMethod = "BH")
+DOclusterplot <- pairwise_termsim(DOclusterplot)
+
+options(enrichplot.colours = c("blue", "grey"))
+p1 <- dotplot(BPclusterplot, showCategory = 20, font.size = 6, title = "GO: Biological Process", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("orange", "grey"))
+p2 <- dotplot(CCclusterplot, showCategory = 20, font.size = 6, title = "GO: Cellular Component", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("green", "grey"))
+p3 <- dotplot(MFclusterplot, showCategory = 20, font.size = 6, title = "GO: Molecular Function", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("brown", "grey"))
+p4 <- dotplot(Pathwayclusterplot, showCategory = 20, font.size = 6, title = "Reactome Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("yellow", "grey"))
+p5 <- dotplot(KEGGclusterplot, showCategory = 20, font.size = 6, title = "KEGG Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("red", "grey"))
+p6 <- dotplot(DOclusterplot, showCategory = 20, font.size = 6, title = "DisGeNet", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+
+
+cowplot::plot_grid(p1, p2, p3, p4, p5, p6, ncol=2, labels=LETTERS[1:6])
+```
+
+```{r}
+pdf(file = "Craniofacial-scRNAseqManuscript/final-figs/cncc_comparison_enrichment_dotplot.pdf", w = 17, h = 22)
+cowplot::plot_grid(p1, p2, p3, p4, p5, p6, ncol=2, labels=LETTERS[1:6])
+dev.off()
+```
+
+```{r}
+cncc_conserv_annot_list <- list(BP =BPclusterplot, CC=CCclusterplot, MF = MFclusterplot, Reactome=Pathwayclusterplot,
+                          KEGG=KEGGclusterplot, DisGeNet=DOclusterplot)
+saveRDS(cncc_conserv_annot_list, "human_mouse_cncc_conservation_final_functional-annotation_lists.rds")
+
+
+cncc_conserv_annot_list <- readRDS("human_mouse_cncc_conservation_final_functional-annotation_lists.rds")
+cncc_conserv_annot_list$BP <- cncc_conserv_annot_list$BP@compareClusterResult
+cncc_conserv_annot_list$CC <- cncc_conserv_annot_list$CC@compareClusterResult
+cncc_conserv_annot_list$MF <- cncc_conserv_annot_list$MF@compareClusterResult
+cncc_conserv_annot_list$Reactome <- cncc_conserv_annot_list$Reactome@compareClusterResult
+cncc_conserv_annot_list$KEGG <- cncc_conserv_annot_list$KEGG@compareClusterResult
+cncc_conserv_annot_list$DisGeNet <- cncc_conserv_annot_list$DisGeNet@compareClusterResult
+openxlsx::write.xlsx(cncc_conserv_annot_list, file = "Craniofacial-scRNAseqManuscript/final-tables/human_mouse_cncc_conservation_final_functional-annotation.xlsx",
+                     sheetName = names(cncc_conserv_annot_list), rowNames = FALSE)
+```
+
+functional annotation for human vs. mouse ectodermal DEGs
+```{r}
+BPclusterplot <- compareCluster(geneCluster = ectoderm_comparisons_genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'BP')
+CCclusterplot <- compareCluster(geneCluster = ectoderm_comparisons_genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'CC')
+MFclusterplot <- compareCluster(geneCluster = ectoderm_comparisons_genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'MF')
+BPclusterplot <- pairwise_termsim(BPclusterplot)
+CCclusterplot <- pairwise_termsim(CCclusterplot)
+MFclusterplot <- pairwise_termsim(MFclusterplot)
+
+Pathwayclusterplot <- compareCluster(geneCluster = ectoderm_comparisons_genelist, fun = "enrichPathway", pvalueCutoff=0.05, pAdjustMethod = "BH", organism = "human")
+Pathwayclusterplot <- pairwise_termsim(Pathwayclusterplot)
+
+KEGGclusterplot <- compareCluster(geneCluster = ectoderm_comparisons_genelist, fun = "enrichKEGG", pvalueCutoff=0.05, pAdjustMethod = "BH", organism = "hsa")
+KEGGclusterplot <- pairwise_termsim(KEGGclusterplot)
+
+
+DOclusterplot <- compareCluster(geneCluster = ectoderm_comparisons_genelist, fun = "enrichDGN", pvalueCutoff=0.05, pAdjustMethod = "BH")
+DOclusterplot <- pairwise_termsim(DOclusterplot)
+
+options(enrichplot.colours = c("blue", "grey"))
+p1 <- dotplot(BPclusterplot, showCategory = 20, font.size = 6, title = "GO: Biological Process", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("orange", "grey"))
+p2 <- dotplot(CCclusterplot, showCategory = 20, font.size = 6, title = "GO: Cellular Component", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("green", "grey"))
+p3 <- dotplot(MFclusterplot, showCategory = 20, font.size = 6, title = "GO: Molecular Function", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("brown", "grey"))
+p4 <- dotplot(Pathwayclusterplot, showCategory = 20, font.size = 6, title = "Reactome Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("yellow", "grey"))
+p5 <- dotplot(KEGGclusterplot, showCategory = 20, font.size = 6, title = "KEGG Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("red", "grey"))
+p6 <- dotplot(DOclusterplot, showCategory = 20, font.size = 6, title = "DisGeNet", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+
+
+cowplot::plot_grid(p1, p2, p3, p4, p5, p6, ncol=2, labels=LETTERS[1:6])
+```
+
+```{r}
+pdf(file = "Craniofacial-scRNAseqManuscript/final-figs/ectoderm_comparison_enrichment_dotplot.pdf", w = 17, h = 22)
+cowplot::plot_grid(p1, p2, p3, p4, p5, p6, ncol=2, labels=LETTERS[1:6])
+dev.off()
+```
+
+```{r}
+ect_conserv_annot_list <- list(BP =BPclusterplot, CC=CCclusterplot, MF = MFclusterplot, Reactome=Pathwayclusterplot,
+                          KEGG=KEGGclusterplot, DisGeNet=DOclusterplot)
+saveRDS(ect_conserv_annot_list, "human_mouse_ectoderm_conservation_final_functional-annotation_lists.rds")
+
+
+ect_conserv_annot_list <- readRDS("human_mouse_ectoderm_conservation_final_functional-annotation_lists.rds")
+ect_conserv_annot_list$BP <- ect_conserv_annot_list$BP@compareClusterResult
+ect_conserv_annot_list$CC <- ect_conserv_annot_list$CC@compareClusterResult
+ect_conserv_annot_list$MF <- ect_conserv_annot_list$MF@compareClusterResult
+ect_conserv_annot_list$Reactome <- ect_conserv_annot_list$Reactome@compareClusterResult
+ect_conserv_annot_list$KEGG <- ect_conserv_annot_list$KEGG@compareClusterResult
+ect_conserv_annot_list$DisGeNet <- ect_conserv_annot_list$DisGeNet@compareClusterResult
+openxlsx::write.xlsx(ect_conserv_annot_list, file = "Craniofacial-scRNAseqManuscript/final-tables/human_mouse_ectoderm_conservation_final_functional-annotation.xlsx",
+                     sheetName = names(ect_conserv_annot_list), rowNames = FALSE)
+```
+
+
+pseudobulk between comparative time points in human and mouse mesenchyme
+```{r}
+annotLookup_ortho_one2one <- orthogene::convert_orthologs(rownames(mouse_mes),input_species="mouse",output_species = "human",
+                                                          non121_strategy = "drop_both_species", method="homologene")
+
+pseudo_human_mes <- AggregateExpression(human_mes[,which(human_mes$celltype=="mesenchyme" & human_mes$stage=="CS17")],group.by="orig.ident")
+pseudo_mouse_mes <- AggregateExpression(mouse_mes[,which(mouse_mes$cell_type=="mesenchyme" & mouse_mes$stage=="E12")],group.by="orig.ident")
+
+hs_mus_genes <- rownames(annotLookup_ortho_one2one)[intersect(na.omit(match(rownames(mouse_mes),annotLookup_ortho_one2one$input_gene)),
+                                                                    na.omit(match(rownames(human_mes),rownames(annotLookup_ortho_one2one))))]
+
+
+annot <- as.data.frame(rbind(cbind(colnames(pseudo_human_mes$RNA),rep("human",ncol(pseudo_human_mes$RNA))),
+                             cbind(colnames(pseudo_mouse_mes$RNA),rep("mouse",ncol(pseudo_mouse_mes$RNA)))))
+colnames(annot) <- c("Sample","Species")
+annot$Species <- factor(annot$Species)
+
+```
+
+DESeq2 between human and mouse mesenchyme at comparitive time points
+```{r}
+
+df_mes <- as.data.frame(cbind(pseudo_human_mes$RNA[match(hs_mus_genes,rownames(pseudo_human_mes$RNA)),],
+                              pseudo_mouse_mes$RNA[match(annotLookup_ortho_one2one$input_gene[match(hs_mus_genes,rownames(annotLookup_ortho_one2one))],rownames(pseudo_mouse_mes$RNA)),]))
+
+dds <- DESeqDataSetFromMatrix(countData = df_mes,
+                              colData = annot,
+                              design = ~ Species)         
+dds <- DESeq(dds)
+resultsNames(dds)
+res <- results(dds, contrast = c("Species","human","mouse"))
+
+DESeq2::plotMA(res, ylim=c(-2,2))  
+
+res <- as.data.frame(res)
+res$gene <- rownames(res)
+
+```
+
+volcano plot for human vs. mouse mesenchymal markers
+```{r}
+# write.table(res,"Craniofacial-scRNAseqManuscript/final-tables/Pseudobulk_DESeq_HumanCS17.vs.MouseE12.5_Mesenchyme.txt",sep='\t',quote=F)
+res <- read.table("Craniofacial-scRNAseqManuscript/final-tables/Pseudobulk_DESeq_HumanCS17.vs.MouseE12.5_Mesenchyme.txt",sep='\t')
+
+human_mes_markers <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/SigGenes_No-Neuro_Main_Celltypes.xlsx")
+human_mes_markers <- human_mes_markers[intersect(which(human_mes_markers$p_val_adj<0.05),which(human_mes_markers$cluster=="mesenchyme")),]
+
+mouse_mes_markers <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/Mouse_SigGenes_E10toE15_MainCellTypes.xlsx")
+mouse_mes_markers <- mouse_mes_markers[intersect(which(mouse_mes_markers$p_val_adj<0.05),which(mouse_mes_markers$cluster=="mesenchyme")),]
+
+select_genes <- intersect(human_mes_markers$gene,rownames(res)[intersect(which(abs(res$log2FoldChange)>1),which(res$padj<0.05))])
+res_sort <- as.data.frame(res[na.omit(match(human_mes_markers$gene,rownames(res))),])
+res_sort <- res_sort[order(res_sort$padj),]
+res_sort$gene <- rownames(res_sort)
+
+
+p1 <- EnhancedVolcano(res,
+                lab = rownames(res),
+                selectLab = res_sort$gene ,
+                x = 'log2FoldChange',
+                y = 'pvalue',
+                title = 'Human CS17 versus Mouse E12.5',
+                subtitle = "Mesenchyme",
+                pCutoffCol='padj',
+                pCutoff = 0.05,
+                FCcutoff = 1,
+                pointSize = 3.0,  legendPosition = 'right',
+                col=c('black', 'black', 'black', 'red3'),
+                labSize = 6.0)
+
+p1
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Final_Mesenchyme_Pseudobulk_DESeq_HumanCS17.vs.MouseE12.5_VolcanoPlot.pdf",width = 11,height = 8)
+p1
+dev.off()
+
+```
+
+get one-to-one orthologs
+```{r}
+mouse_genename_lookup <- orthogene::convert_orthologs(rownames(mouse_mes),input_species="mouse",output_species = "human",non121_strategy = "drop_both_species", method="homologene") 
+
+mart <-  useMart("ENSEMBL_MART_ENSEMBL") #, host = "https://useast.ensembl.org")
+mart <- useDataset("hsapiens_gene_ensembl", mart)
+annotLookup <- getBM(
+  mart = mart,
+  attributes = c(
+    "hgnc_symbol","description",
+    "entrezgene_id",
+    "gene_biotype"),
+  filter = "hgnc_symbol",
+  values = rownames(mouse_genename_lookup),
+  uniqueRows=TRUE)
+
+mouse_genename_lookup$entrez <- annotLookup$entrezgene_id[match(rownames(mouse_genename_lookup),annotLookup$hgnc_symbol)]
+mouse_genename_lookup <- mouse_genename_lookup[-which(is.na(mouse_genename_lookup$entrez)),]
+
+mouse_mes_markers$hs_gene <- rownames(mouse_genename_lookup)[match(mouse_mes_markers$gene,mouse_genename_lookup$input_gene)]
+mouse_mes_markers$hs_entrez <- mouse_genename_lookup$entrez[match(mouse_mes_markers$gene,mouse_genename_lookup$input_gene)]
+mouse_mes_markers <- mouse_mes_markers[-which(is.na(mouse_mes_markers$hs_gene) | is.na(mouse_mes_markers$hs_entrez)),]
+
+human_mes_markers <- human_mes_markers[which(human_mes_markers$Entrez%in%mouse_genename_lookup$entrez),]
+  
+human_mouse_mes_markers <- list(mouse=setdiff(mouse_mes_markers$hs_entrez,human_mes_markers$Entrez),
+                                human=setdiff(human_mes_markers$Entrez,mouse_mes_markers$hs_entrez),
+                                conserved=union(human_mes_markers$Entrez,mouse_mes_markers$hs_entrez))
+```
+
+```{r}
+sig_DEG <- res[which(res$padj<0.05),]
+sig_DEG$entrez <- mouse_genename_lookup$entrez[match(sig_DEG$gene,rownames(mouse_genename_lookup))]
+human_mouse_mes_markers_DEGoverlap <- human_mouse_mes_markers
+human_mouse_mes_markers_DEGoverlap$human <- intersect(human_mouse_mes_markers_DEGoverlap$human,
+                                                      sig_DEG$entrez[which(sig_DEG$log2FoldChange>0)])
+
+human_mouse_mes_markers_DEGoverlap$mouse <- intersect(human_mouse_mes_markers_DEGoverlap$mouse,
+                                                      sig_DEG$entrez[which(sig_DEG$log2FoldChange<0)])
+```
+
+
+```{r}
+# mouse_genename_lookup$entrez 
+# 
+# test_dgn <- enrichDGN(as.character(human_mouse_mes_markers$conserved),
+#                                            readable = TRUE, pvalueCutoff=0.05, pAdjustMethod = "BH",#qvalueCutoff=1,
+#                                            universe = as.character(mouse_genename_lookup$entrez))
+```
+
+DisGeNET analysis for human specific mesenchymal DEGs
+```{r}
+
+human_specific_mesenchyme_dgn <- enrichDGN(human_specific_mesenchyme,readable = TRUE, pvalueCutoff=0.05, pAdjustMethod = "BH")
+
+options(enrichplot.colours = c("red","grey"))
+# human_specific_mesenchyme_dgn_df <- human_specific_mesenchyme_dgn@result
+mutate(human_specific_mesenchyme_dgn, qscore = -log(p.adjust, base=10)) %>% 
+  barplot(x="qscore",showCategory=20)
+
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Final_Mesenchyme_Pseudobulk_DESeq_HumanCS17.vs.MouseE12.5_DGN_BarPlots.pdf",width = 11,height = 8)
+options(enrichplot.colours = c("red","grey"))
+# human_specific_mesenchyme_dgn_df <- human_specific_mesenchyme_dgn@result
+mutate(human_specific_mesenchyme_dgn, qscore = -log(p.adjust, base=10)) %>% 
+  barplot(x="qscore",showCategory=20)
+dev.off()
+
+```
+
+cnet plots and heatplots for human specific mesenchyme
+```{r}
+foldChange <- sig_DEG$log2FoldChange[match(rownames(mouse_genename_lookup),rownames(sig_DEG))]
+names(foldChange) <- rownames(mouse_genename_lookup)
+foldChange <- foldChange[-which(is.na(foldChange))]
+
+options(enrichplot.colours = c("blue","grey","red"))
+p2 <- cnetplot(human_specific_mesenchyme_dgn, categorySize="p.adjust", foldChange = foldChange,cex_label_gene=0.6) + ggtitle("Disease Ontology Human Specific Mesenchyme")
+
+human_specific_mesenchyme_dgn_df <- human_specific_mesenchyme_dgn@result
+human_specific_mesenchyme_dgn_df$Description[intersect(grep("ALX3",human_specific_mesenchyme_dgn_df$geneID), which(human_specific_mesenchyme_dgn_df$qvalue<0.05))]
+
+selected_pathways <- c("Microphthalmos","Depressed nasal bridge",
+                       "Low set ears","Cranioschisis","Cleft palate, isolated",
+                       "Craniofacial Abnormalities","Craniosynostosis")
+p3 <- cnetplot(human_specific_mesenchyme_dgn, showCategory = selected_pathways, categorySize="p.adjust", foldChange = foldChange,cex_label_gene=0.6) + ggtitle("Disease Ontology Human Specific Mesenchyme - Selected Pathways")
+
+p4 <- heatplot(human_specific_mesenchyme_dgn, showCategory=20, foldChange = foldChange) +theme(axis.text.x = element_text(size = 6,color="black"))+ ggtitle("Disease Ontology Human Specific Mesenchyme")
+
+ALX3_pathways <- subset(human_specific_mesenchyme_dgn@result[which(human_specific_mesenchyme_dgn@result$pvalue<0.05),],
+                        grepl('ALX3', geneID))$Description
+p5 <- cnetplot(human_specific_mesenchyme_dgn, showCategory = ALX3_pathways[1:10], categorySize="p.adjust", foldChange = foldChange,cex_label_gene=0.6) + ggtitle("Disease Ontology Human Specific Mesenchyme: Selected ALX3 Pathways")
+
+p6 <- heatplot(human_specific_mesenchyme_dgn, showCategory=ALX3_pathways, foldChange = foldChange)+theme(axis.text.x = element_text(size = 6,color="black"))+ ggtitle("Disease Ontology Human Specific Mesenchyme: ALX3 Pathways")
+
+p1
+p2
+p3
+p4
+p5
+p6
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Final_Mesenchyme_Pseudobulk_DESeq_HumanCS17.vs.MouseE12.5_DGN_NetworkPlot.pdf",width = 18,height = 12)
+p1
+p2
+p3
+p5
+dev.off()
+
+
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Final_Mesenchyme_Pseudobulk_DESeq_HumanCS17.vs.MouseE12.5_DGN_HeatPlot.pdf",width = 15,height = 10)
+p4
+p6
+dev.off()
+```
+
+top mes sign genes from human specific DGN analysis
+```{r}
+mes_sig_genes <- unique(as.vector(strsplit2(human_specific_mesenchyme_dgn_df$geneID[which(human_specific_mesenchyme_dgn_df$Description%in%selected_pathways)],split="/")))
+
+mes_sig_genes_topFC <- res[na.omit(match(mes_sig_genes,res$gene)),]
+mes_sig_genes_topFC <- mes_sig_genes_topFC[order(mes_sig_genes_topFC$log2FoldChange,decreasing = T),]
+
+```
+
+
+Functional annotation for human vs. mouse mesenchymal markers
+```{r}
+
+genelist <- list()
+genelist[['Human Specific']] <- human_mouse_mes_markers$human
+genelist[['Conserved']] <- human_mouse_mes_markers$conserved
+genelist[['Mouse Specific']] <- human_mouse_mes_markers$mouse
+
+background_genes <- mouse_genename_lookup$entrez
+
+BPclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'BP', universe = background_genes)
+BPclusterplot <- pairwise_termsim(BPclusterplot)
+
+CCclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'CC', universe = background_genes)
+CCclusterplot <- pairwise_termsim(CCclusterplot)
+
+MFclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'MF', universe = background_genes)
+MFclusterplot <- pairwise_termsim(MFclusterplot)
+
+Pathwayclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichPathway", pvalueCutoff=0.05, pAdjustMethod = "BH", universe = background_genes)
+Pathwayclusterplot <- pairwise_termsim(Pathwayclusterplot)
+
+KEGGclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichKEGG", pvalueCutoff=0.05, pAdjustMethod = "BH", universe = background_genes)
+KEGGclusterplot <- pairwise_termsim(KEGGclusterplot)
+
+DOclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichDGN", pvalueCutoff=0.05, pAdjustMethod = "BH", universe = background_genes)
+DOclusterplot <- pairwise_termsim(DOclusterplot)
+
+
+options(enrichplot.colours = c("blue", "grey"))
+p1 <- dotplot(BPclusterplot, showCategory = 5, font.size = 6, title = "GO: Biological Process", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("orange", "grey"))
+p2 <- dotplot(CCclusterplot, showCategory = 5, font.size = 6, title = "GO: Cellular Component", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("green", "grey"))
+p3 <- dotplot(MFclusterplot, showCategory = 5, font.size = 6, title = "GO: Molecular Function", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("brown", "grey"))
+p4 <- dotplot(Pathwayclusterplot, showCategory = 10, font.size = 6, title = "Reactome Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("yellow", "grey"))
+p5 <- dotplot(KEGGclusterplot, showCategory = 10, font.size = 6, title = "KEGG Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("red", "grey"))
+p6 <- dotplot(DOclusterplot, showCategory = 10, font.size = 6, title = "DisGeNet", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+
+p1
+p2
+p3
+p4
+p5
+p6
+```
+
+```{r}
+mes_human_mouse_annot_list <- list(BP =BPclusterplot, CC=CCclusterplot, MF = MFclusterplot, Reactome=Pathwayclusterplot,
+                          KEGG=KEGGclusterplot, DisGeNet=DOclusterplot)
+saveRDS(mes_human_mouse_annot_list, "human_mouse_mes_conservation_markers_functional-annotation_lists_27Mar.rds")
+
+mes_human_mouse_annot_list <- readRDS("human_mouse_mes_conservation_markers_functional-annotation_lists_27Mar.rds")
+mes_human_mouse_annot_list$BP <- mes_human_mouse_annot_list$BP@compareClusterResult
+mes_human_mouse_annot_list$CC <- mes_human_mouse_annot_list$CC@compareClusterResult
+mes_human_mouse_annot_list$MF <- mes_human_mouse_annot_list$MF@compareClusterResult
+mes_human_mouse_annot_list$Reactome <- mes_human_mouse_annot_list$Reactome@compareClusterResult
+mes_human_mouse_annot_list$KEGG <- mes_human_mouse_annot_list$KEGG@compareClusterResult
+mes_human_mouse_annot_list$DisGeNet <- mes_human_mouse_annot_list$DisGeNet@compareClusterResult
+openxlsx::write.xlsx(mes_human_mouse_annot_list, file = "Craniofacial-scRNAseqManuscript/final-tables/human_mouse_mes_conservation_markers_functional-annotation.xlsx",
+                     sheetName = names(mes_human_mouse_annot_list), rowNames = FALSE)
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Human_mouse_mes_conservation_markers_Top10_FunctionalEnrichment_dotplot.pdf",width=8.5,height=16)
+p1
+p2
+p3
+p4
+p5
+p6
+dev.off()
+```
+
+
+
+CNCC marker conservation
+```{r}
+human_cncc_markers <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/SigGenes_No-Neuro_Main_Celltypes.xlsx")
+human_cncc_markers <- human_cncc_markers[intersect(which(human_cncc_markers$p_val_adj<0.05),which(human_cncc_markers$cluster=="SOX2-_SOX10+")),]
+
+mouse_cncc_markers <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/Mouse_SigGenes_E10toE15_MainCellTypes.xlsx")
+mouse_cncc_markers <- mouse_cncc_markers[intersect(which(mouse_cncc_markers$p_val_adj<0.05),which(mouse_cncc_markers$cluster=="SOX2-_SOX10+")),]
+
+mouse_cncc_markers$hs_gene <- rownames(mouse_genename_lookup)[match(mouse_cncc_markers$gene,mouse_genename_lookup$input_gene)]
+mouse_cncc_markers$hs_entrez <- mouse_genename_lookup$entrez[match(mouse_cncc_markers$gene,mouse_genename_lookup$input_gene)]
+mouse_cncc_markers <- mouse_cncc_markers[-which(is.na(mouse_cncc_markers$hs_gene) | is.na(mouse_cncc_markers$hs_entrez)),]
+
+human_cncc_markers <- human_cncc_markers[which(human_cncc_markers$Entrez%in%mouse_genename_lookup$entrez),]
+  
+human_mouse_cncc_markers <- list(mouse=setdiff(mouse_cncc_markers$hs_entrez,human_cncc_markers$Entrez),
+                                human=setdiff(human_cncc_markers$Entrez,mouse_cncc_markers$hs_entrez),
+                                conserved=union(human_cncc_markers$Entrez,mouse_cncc_markers$hs_entrez))
+
+```
+
+Functional annotation for human vs. mouse cncc markers
+```{r}
+
+genelist <- list()
+genelist[['Human Specific']] <- human_mouse_cncc_markers$human
+genelist[['Conserved']] <- human_mouse_cncc_markers$conserved
+genelist[['Mouse Specific']] <- human_mouse_cncc_markers$mouse
+
+background_genes <- mouse_genename_lookup$entrez
+
+BPclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'BP', universe = background_genes)
+BPclusterplot <- pairwise_termsim(BPclusterplot)
+
+CCclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'CC', universe = background_genes)
+CCclusterplot <- pairwise_termsim(CCclusterplot)
+
+MFclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'MF', universe = background_genes)
+MFclusterplot <- pairwise_termsim(MFclusterplot)
+
+Pathwayclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichPathway", pvalueCutoff=0.05, pAdjustMethod = "BH", universe = background_genes)
+Pathwayclusterplot <- pairwise_termsim(Pathwayclusterplot)
+
+KEGGclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichKEGG", pvalueCutoff=0.05, pAdjustMethod = "BH", universe = background_genes)
+KEGGclusterplot <- pairwise_termsim(KEGGclusterplot)
+
+DOclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichDGN", pvalueCutoff=0.05, pAdjustMethod = "BH", universe = background_genes)
+DOclusterplot <- pairwise_termsim(DOclusterplot)
+
+
+options(enrichplot.colours = c("blue", "grey"))
+p1 <- dotplot(BPclusterplot, showCategory = 5, font.size = 6, title = "GO: Biological Process", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("orange", "grey"))
+p2 <- dotplot(CCclusterplot, showCategory = 5, font.size = 6, title = "GO: Cellular Component", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("green", "grey"))
+p3 <- dotplot(MFclusterplot, showCategory = 5, font.size = 6, title = "GO: Molecular Function", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("brown", "grey"))
+p4 <- dotplot(Pathwayclusterplot, showCategory = 10, font.size = 6, title = "Reactome Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("yellow", "grey"))
+p5 <- dotplot(KEGGclusterplot, showCategory = 10, font.size = 6, title = "KEGG Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("red", "grey"))
+p6 <- dotplot(DOclusterplot, showCategory = 10, font.size = 6, title = "DisGeNet", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+
+p1
+p2
+p3
+p4
+p5
+p6
+```
+
+```{r}
+cncc_human_mouse_annot_list <- list(BP =BPclusterplot, CC=CCclusterplot, MF = MFclusterplot, Reactome=Pathwayclusterplot,
+                          KEGG=KEGGclusterplot, DisGeNet=DOclusterplot)
+saveRDS(cncc_human_mouse_annot_list, "human_mouse_cncc_conservation_markers_functional-annotation_lists_27Mar.rds")
+
+cncc_human_mouse_annot_list <- readRDS("human_mouse_cncc_conservation_markers_functional-annotation_lists_27Mar.rds")
+cncc_human_mouse_annot_list$BP <- cncc_human_mouse_annot_list$BP@compareClusterResult
+cncc_human_mouse_annot_list$CC <- cncc_human_mouse_annot_list$CC@compareClusterResult
+cncc_human_mouse_annot_list$MF <- cncc_human_mouse_annot_list$MF@compareClusterResult
+cncc_human_mouse_annot_list$Reactome <- cncc_human_mouse_annot_list$Reactome@compareClusterResult
+cncc_human_mouse_annot_list$KEGG <- cncc_human_mouse_annot_list$KEGG@compareClusterResult
+cncc_human_mouse_annot_list$DisGeNet <- cncc_human_mouse_annot_list$DisGeNet@compareClusterResult
+openxlsx::write.xlsx(cncc_human_mouse_annot_list, file = "Craniofacial-scRNAseqManuscript/final-tables/human_mouse_cncc_conservation_markers_functional-annotation.xlsx",
+                     sheetName = names(cncc_human_mouse_annot_list), rowNames = FALSE)
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Human_mouse_cncc_conservation_markers_Top10_FunctionalEnrichment_dotplot.pdf",width=8.5,height=16)
+p1
+p2
+p3
+p4
+p5
+p6
+dev.off()
+```
+
+
+Ect marker conservation
+```{r}
+human_ect_markers <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/SigGenes_No-Neuro_Main_Celltypes.xlsx")
+human_ect_markers <- human_ect_markers[intersect(which(human_ect_markers$p_val_adj<0.05),which(human_ect_markers$cluster=="ectoderm")),]
+
+mouse_ect_markers <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/Mouse_SigGenes_E10toE15_MainCellTypes.xlsx")
+mouse_ect_markers <- mouse_ect_markers[intersect(which(mouse_ect_markers$p_val_adj<0.05),which(mouse_ect_markers$cluster=="ectoderm")),]
+
+mouse_ect_markers$hs_gene <- rownames(mouse_genename_lookup)[match(mouse_ect_markers$gene,mouse_genename_lookup$input_gene)]
+mouse_ect_markers$hs_entrez <- mouse_genename_lookup$entrez[match(mouse_ect_markers$gene,mouse_genename_lookup$input_gene)]
+mouse_ect_markers <- mouse_ect_markers[-which(is.na(mouse_ect_markers$hs_gene) | is.na(mouse_ect_markers$hs_entrez)),]
+
+human_ect_markers <- human_ect_markers[which(human_ect_markers$Entrez%in%mouse_genename_lookup$entrez),]
+  
+human_mouse_ect_markers <- list(mouse=setdiff(mouse_ect_markers$hs_entrez,human_ect_markers$Entrez),
+                                human=setdiff(human_ect_markers$Entrez,mouse_ect_markers$hs_entrez),
+                                conserved=union(human_ect_markers$Entrez,mouse_ect_markers$hs_entrez))
+
+```
+
+Functional annotation for human vs. mouse ectodermal markers
+```{r}
+
+genelist <- list()
+genelist[['Human Specific']] <- human_mouse_ect_markers$human
+genelist[['Conserved']] <- human_mouse_ect_markers$conserved
+genelist[['Mouse Specific']] <- human_mouse_ect_markers$mouse
+
+background_genes <- mouse_genename_lookup$entrez
+
+BPclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'BP', universe = background_genes)
+BPclusterplot <- pairwise_termsim(BPclusterplot)
+
+CCclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'CC', universe = background_genes)
+CCclusterplot <- pairwise_termsim(CCclusterplot)
+
+MFclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'MF', universe = background_genes)
+MFclusterplot <- pairwise_termsim(MFclusterplot)
+
+Pathwayclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichPathway", pvalueCutoff=0.05, pAdjustMethod = "BH", universe = background_genes)
+Pathwayclusterplot <- pairwise_termsim(Pathwayclusterplot)
+
+KEGGclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichKEGG", pvalueCutoff=0.05, pAdjustMethod = "BH", universe = background_genes)
+KEGGclusterplot <- pairwise_termsim(KEGGclusterplot)
+
+DOclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichDGN", pvalueCutoff=0.05, pAdjustMethod = "BH", universe = background_genes)
+DOclusterplot <- pairwise_termsim(DOclusterplot)
+
+
+options(enrichplot.colours = c("blue", "grey"))
+p1 <- dotplot(BPclusterplot, showCategory = 5, font.size = 6, title = "GO: Biological Process", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("orange", "grey"))
+p2 <- dotplot(CCclusterplot, showCategory = 5, font.size = 6, title = "GO: Cellular Component", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("green", "grey"))
+p3 <- dotplot(MFclusterplot, showCategory = 5, font.size = 6, title = "GO: Molecular Function", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("brown", "grey"))
+p4 <- dotplot(Pathwayclusterplot, showCategory = 10, font.size = 6, title = "Reactome Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("yellow", "grey"))
+p5 <- dotplot(KEGGclusterplot, showCategory = 10, font.size = 6, title = "KEGG Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+options(enrichplot.colours = c("red", "grey"))
+p6 <- dotplot(DOclusterplot, showCategory = 10, font.size = 6, title = "DisGeNet", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12))
+
+p1
+p2
+p3
+p4
+p5
+p6
+```
+
+```{r}
+ect_human_mouse_annot_list <- list(BP =BPclusterplot, CC=CCclusterplot, MF = MFclusterplot, Reactome=Pathwayclusterplot,
+                          KEGG=KEGGclusterplot, DisGeNet=DOclusterplot)
+saveRDS(ect_human_mouse_annot_list, "human_mouse_ect_conservation_markers_functional-annotation_lists_27Mar.rds")
+
+ect_human_mouse_annot_list <- readRDS("human_mouse_ect_conservation_markers_functional-annotation_lists_27Mar.rds")
+ect_human_mouse_annot_list$BP <- ect_human_mouse_annot_list$BP@compareClusterResult
+ect_human_mouse_annot_list$CC <- ect_human_mouse_annot_list$CC@compareClusterResult
+ect_human_mouse_annot_list$MF <- ect_human_mouse_annot_list$MF@compareClusterResult
+ect_human_mouse_annot_list$Reactome <- ect_human_mouse_annot_list$Reactome@compareClusterResult
+ect_human_mouse_annot_list$KEGG <- ect_human_mouse_annot_list$KEGG@compareClusterResult
+ect_human_mouse_annot_list$DisGeNet <- ect_human_mouse_annot_list$DisGeNet@compareClusterResult
+openxlsx::write.xlsx(ect_human_mouse_annot_list, file = "Craniofacial-scRNAseqManuscript/final-tables/human_mouse_ect_conservation_markers_functional-annotation.xlsx",
+                     sheetName = names(ect_human_mouse_annot_list), rowNames = FALSE)
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Human_mouse_ect_conservation_markers_Top10_FunctionalEnrichment_dotplot.pdf",width=8.5,height=16)
+p1
+p2
+p3
+p4
+p5
+p6
+dev.off()
+```

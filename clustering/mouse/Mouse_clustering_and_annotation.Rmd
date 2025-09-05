@@ -1,0 +1,686 @@
+---
+title: "Mouse_clustering_and_annotation"
+output: html_document
+date: "2025-04-16"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "/scr1/users/manchela/Data") 
+library(Seurat)
+library(tidyverse)
+library(harmony)
+library(patchwork)
+library(scales)
+library(scCustomize)
+library(clustree)
+library(pheatmap)
+```
+
+
+Load in inHouse and DSouza data
+```{r}
+#loading inHouse data
+counts <- Read10X_h5("/Volumes/Extreme SSD/Mouse_cellranger/E9_1_matrix.h5")
+E9_1 <- CreateSeuratObject(counts$`Gene Expression`,assay = "RNA",project = "E9_1")
+counts <- Read10X_h5("/Volumes/Extreme SSD/Mouse_cellranger/E9_2_matrix.h5")
+E9_2 <- CreateSeuratObject(counts$`Gene Expression`,assay = "RNA",project = "E9_2")
+counts <- Read10X_h5("/Volumes/Extreme SSD/Mouse_cellranger/E9_3_matrix.h5")
+E9_3 <- CreateSeuratObject(counts$`Gene Expression`,assay = "RNA",project = "E9_3")
+counts <- Read10X_h5("/Volumes/Extreme SSD/Mouse_cellranger/E10_1_matrix.h5")
+E10_1 <- CreateSeuratObject(counts$`Gene Expression`,assay = "RNA",project = "E10_1")
+counts <- Read10X_h5("/Volumes/Extreme SSD/Mouse_cellranger/E10_2_matrix.h5")
+E10_2 <- CreateSeuratObject(counts$`Gene Expression`,assay = "RNA",project = "E10_2")
+counts <- Read10X_h5("/Volumes/Extreme SSD/Mouse_cellranger/E10_3_matrix.h5")
+E10_3 <- CreateSeuratObject(counts$`Gene Expression`,assay = "RNA",project = "E10_3")
+counts <- Read10X_h5("/Volumes/Extreme SSD/Mouse_cellranger/E11_1_matrix.h5")
+E11_1 <- CreateSeuratObject(counts$`Gene Expression`,assay = "RNA",project = "E11_1")
+counts <- Read10X_h5("/Volumes/Extreme SSD/Mouse_cellranger/E11_2_matrix.h5")
+E11_2 <- CreateSeuratObject(counts$`Gene Expression`,assay = "RNA",project = "E11_2")
+counts <- Read10X_h5("/Volumes/Extreme SSD/Mouse_cellranger/E11_3_matrix.h5")
+E11_3 <- CreateSeuratObject(counts$`Gene Expression`,assay = "RNA",project = "E11_3")
+counts <- Read10X_h5("/Volumes/Extreme SSD/Mouse_cellranger/E12_1_matrix.h5")
+E12_1 <- CreateSeuratObject(counts$`Gene Expression`,assay = "RNA",project = "E12_1")
+counts <- Read10X_h5("/Volumes/Extreme SSD/Mouse_cellranger/E12_2_matrix.h5")
+E12_2 <- CreateSeuratObject(counts$`Gene Expression`,assay = "RNA",project = "E12_2")
+counts <- Read10X_h5("/Volumes/Extreme SSD/Mouse_cellranger/E12_3_matrix.h5")
+E12_3 <- CreateSeuratObject(counts$`Gene Expression`,assay = "RNA",project = "E12_3")
+cds <- merge(E10_1,c(E10_2,E10_3,E11_1,E11_2,E11_3,E12_1,E12_2,E12_3))
+cds$data <- "inHouse"
+cds@meta.data <- separate(cds@meta.data ,col = "orig.ident" ,sep = "_",into = c("stage","rep"),remove = F)
+
+# Combine inHouse data with later stages from DSouza
+e13 <- Read10X("/Users/naghamkhourifarah/Downloads/GSE245469_RAW/scRNA/E13")
+e13 <- CreateSeuratObject(e13,assay = "RNA",project = "E13_1")
+e13$data <- "DSouza"
+e13$stage <- "E13"
+e14 <- Read10X("/Users/naghamkhourifarah/Downloads/GSE245469_RAW/scRNA/E14")
+e14 <- CreateSeuratObject(e14,assay = "RNA",project = "E14_1")
+e14$data <- "DSouza"
+e14$stage <- "E14"
+e15 <- Read10X("/Users/naghamkhourifarah/Downloads/GSE245469_RAW/scRNA/E15")
+e15 <- CreateSeuratObject(e15,assay = "RNA",project = "E15_1")
+e15$data <- "DSouza"
+e15$stage <- "E15"
+
+e13m <- Read10X("/Users/naghamkhourifarah/Downloads/GSE245469_RAW/Multiome/E13_wt")
+e13m <- CreateSeuratObject(e13m$`Gene Expression`,assay = "RNA",project = "E13_2")
+e13m$data <- "DSouza"
+e13m$stage <- "E13"
+
+e15m <- Read10X("/Users/naghamkhourifarah/Downloads/GSE245469_RAW/Multiome/E15_wt")
+e15m <- CreateSeuratObject(e15m$`Gene Expression`,assay = "RNA",project = "E15_2")
+e15m$data <- "DSouza"
+e15m$stage <- "E15"
+
+cds2 <- merge(cds,c(e13,e13m,e14,e15,e15m))
+
+```
+
+```{r}
+cds2 <- readRDS("/mnt/isilon/cotney_lab_hpc/manchela/misc/Mouse_All_unfiltered.rds")
+cds2 <- cds2[,-which(cds2$stage=="E9")]
+```
+
+Pre-processing
+```{r}
+#Filtering and QC
+Idents(cds2) <- cds2$orig.ident
+cds2[["percent.mt"]] <- PercentageFeatureSet(cds2, pattern = "^mt-")
+p1 <- VlnPlot(object = cds2, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3,pt.size = 0)
+cds.filt <- subset(cds2, subset = nFeature_RNA < 7000 & nCount_RNA < 20000 & percent.mt < 10 & nCount_RNA > 500 & nFeature_RNA > 500)
+p2 <- VlnPlot(object = cds.filt, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3, pt.size = 0)
+p3 <- FeatureScatter(object = cds2, feature1 = "nCount_RNA", feature2 = "percent.mt")
+p4 <- FeatureScatter(object = cds2, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+p5 <- FeatureScatter(object = cds.filt, feature1 = "nCount_RNA", feature2 = "percent.mt")
+p6 <- FeatureScatter(object = cds.filt, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")
+
+p1
+p2
+p3
+p4
+p5
+p6
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_QC_E10toE15.pdf",w=16,height = 8)
+p1+plot_annotation("Before Filtration")
+p2+plot_annotation("After Filtration")
+(p3+p4)+plot_annotation("Before Filtration")
+(p5+p6)+plot_annotation("After Filtration")
+dev.off()
+
+```
+
+
+```{r}
+cds.filt$stage <- factor(cds.filt$stage, levels = c("E10","E11","E12","E13","E14","E15"))
+cds.filt <- JoinLayers(cds.filt)
+require(biomaRt)
+mart_m <- useMart("ENSEMBL_MART_ENSEMBL", host = "useast.ensembl.org")
+mart_m <- useDataset("mmusculus_gene_ensembl", mart_m)
+annotLookup2 <- getBM(
+  mart = mart_m,
+  attributes = c(
+    "mgi_symbol","description",
+    "entrezgene_id",
+    "ensembl_gene_id",
+    "gene_biotype"),
+  filter = "mgi_symbol",
+  values = rownames(cds.filt),
+  uniqueRows=TRUE)
+dim(annotLookup2)
+
+annotLookup <- annotLookup2 %>% drop_na()
+dim(annotLookup)
+MitoFeatures <- grep("mt-",rownames(cds.filt))
+count <- GetAssayData(cds.filt,assay = "RNA",slot = "count")
+count <- count[-MitoFeatures,]
+cds.filt <- subset(cds.filt, features = intersect(rownames(count),annotLookup$mgi_symbol))
+#processing and clustering of combined data
+cds.filt <- NormalizeData(cds.filt) %>% 
+  FindVariableFeatures() 
+cds.filt <- CellCycleScoring(cds.filt, s.features = str_to_sentence(cc.genes$s.genes), g2m.features = str_to_sentence(cc.genes$g2m.genes), set.ident = F)
+cds.filt <- ScaleData(cds.filt,vars.to.regress = c("S.Score", "G2M.Score")) %>% 
+  RunPCA(verbose = FALSE) %>% 
+  RunHarmony(group.by.vars = "orig.ident")
+
+cds.filt <- RunUMAP(cds.filt, reduction = "harmony", dims = 1:30, min.dist = 0.3) %>%
+  FindNeighbors(reduction = "harmony", dims = 1:30, verbose = FALSE) %>%
+  FindClusters(resolution = c(0.1,0.2,0.4,0.6,0.8,1), verbose = FALSE)
+
+Idents(cds.filt) <- cds.filt$RNA_snn_res.0.1
+
+p1 <- DimPlot(cds.filt, label = T)+NoAxes()+NoLegend()
+p2 <- DimPlot(cds.filt, group.by = "orig.ident")+NoAxes()
+p3 <- DimPlot(cds.filt,split.by = "stage",label = T)+NoAxes()+NoLegend()
+p4 <- DimPlot(cds.filt,group.by = "Phase",label = T)+NoAxes()+NoLegend()
+p1+p2
+p3
+p4
+```
+
+```{r}
+
+
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_UMAP_harmony_filtered_E10toE15.pdf",width = 16,height = 8)
+p1+p2
+dev.off()
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_UMAP_byStage_filtered_E10toE15.pdf",width = 20,height = 4)
+p3
+dev.off()
+
+```
+
+filter neuronal populations
+```{r}
+
+#Filter neural and radial glia cluster/s
+Idents(cds.filt) <-  cds.filt$RNA_snn_res.0.1
+p <- DimPlot(cds.filt, label = T,group.by="RNA_snn_res.0.1")+NoAxes()+NoLegend()
+
+ortholog_lookup <- orthogene::convert_orthologs(rownames(cds.filt),input_species="mouse",output_species = "human",non121_strategy = "drop_both_species", method="gprofiler") 
+
+# Neuronal and Glial Module Scores from Eze et al. 2021 (doi: 10.1038/s41593-020-00794-1)
+
+markers <- openxlsx::read.xlsx("/mnt/isilon/cotney_lab_hpc/manchela/misc/Neuronal_Markers_Eze2021.xlsx")
+markers$pct.diff <- markers$pct.1-markers$pct.2
+
+# taking neuronal and glial markers from the prosencephalon only
+neuronal_markers <- markers$gene[which(markers$Celltype=="Neuronal" & markers$p_val_adj<0.05&
+                                                  (markers$cluster%in%c(2,22,32,33,41,42,52,52,56)) & 
+                                                  markers$pct.diff>0.5)]
+
+glial_markers <- markers$gene[which(markers$Celltype=="Radial Glial" & markers$p_val_adj<0.05&
+                                                 (markers$cluster%in%c(1,4,7,14,18,20,24,34,36,45,60)) &
+                                              markers$pct.diff>0.5)]
+
+"TUBB3"%in%neuronal_markers
+"MAP2"%in%neuronal_markers
+
+neuronal_markers <- na.omit(ortholog_lookup$input_gene[match(neuronal_markers,rownames(ortholog_lookup))])
+glial_markers <- na.omit(ortholog_lookup$input_gene[match(glial_markers,rownames(ortholog_lookup))])
+
+
+cds.filt <- AddModuleScore(cds.filt, list(neuronal_markers), name = "Neuronal_ModuleScore")
+cds.filt <- AddModuleScore(cds.filt, list(glial_markers), name = "Glia_ModuleScore")
+
+VlnPlot_scCustom(seurat_object = cds.filt, features = "Neuronal_ModuleScore1", 
+                 plot_median = TRUE, pt.size = 0) + NoLegend() + geom_hline(yintercept = median(cds.filt$Neuronal_ModuleScore1))
+# cluster 2
+
+VlnPlot_scCustom(seurat_object = cds.filt, features = "Glia_ModuleScore1", 
+                 plot_median = TRUE, pt.size = 0) + NoLegend() + geom_hline(yintercept = median(cds.filt$Glia_ModuleScore1))
+# No radial glia clusters
+
+FeaturePlot(cds.filt,c("Neuronal_ModuleScore1","Glia_ModuleScore1"))
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Neuronal_Glial_ModuleScores.pdf",width=11,height=8.5)
+
+VlnPlot_scCustom(seurat_object = cds.filt, features = "Neuronal_ModuleScore1", 
+                 plot_median = TRUE, pt.size = 0) + NoLegend() + geom_hline(yintercept = median(cds.filt$Neuronal_ModuleScore1))
+# cluster 2
+
+VlnPlot_scCustom(seurat_object = cds.filt, features = "Glia_ModuleScore1", 
+                 plot_median = TRUE, pt.size = 0) + NoLegend() + geom_hline(yintercept = median(cds.filt$Glia_ModuleScore1))
+# No radial glia clusters
+
+FeaturePlot(cds.filt,c("Neuronal_ModuleScore1","Glia_ModuleScore1"))
+dev.off()
+```
+
+```{r}
+# saveRDS(cds.filt,"Mouse_initial_filtered.rds")
+cds.filt <- readRDS("Mouse_initial_filtered.rds")
+
+```
+
+```{r}
+cds <- readRDS("face_mouse_final.rds")
+
+dim(cds)
+```
+
+
+```{r}
+# remove neural cluster 2
+cds <- subset(cds.filt, idents = "2", invert=T)
+cds <- NormalizeData(cds) %>% 
+  FindVariableFeatures() %>% 
+  ScaleData(vars.to.regress = c("S.Score", "G2M.Score")) %>% 
+  RunPCA(verbose = FALSE) %>% 
+  RunHarmony(group.by.vars = "orig.ident")
+ElbowPlot(cds,ndims = 50)
+cds <- RunUMAP(cds, reduction = "harmony", dims = 1:30, min.dist = 0.3) %>%
+  FindNeighbors(reduction = "harmony", dims = 1:30, verbose = FALSE) %>%
+  FindClusters(resolution = c(0.1,0.2,0.4,0.6,0.8,1), verbose = FALSE)
+
+p1 <- DimPlot(cds, group.by="RNA_snn_res.0.1",label = T)+NoAxes()+NoLegend()
+p2 <- DimPlot(cds, group.by = "stage")+NoAxes()
+p3 <- DimPlot(cds,group.by="RNA_snn_res.0.1",split.by = "stage",label = T)+NoAxes()+NoLegend()
+p1+p2
+p3
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_UMAP_harmony_E10toE15_NoNeur.pdf",width = 16,height = 8)
+p1+p2
+dev.off()
+
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_UMAP_byStage_E10toE15_NoNeur.pdf",width = 20,height = 4)
+p3
+dev.off()
+```
+
+find marker genes
+```{r}
+#find marker genes for each cluster
+Idents(cds) <- cds$RNA_snn_res.0.1
+sig_genes <- FindAllMarkers(cds, assay = "RNA" ,logfc.threshold = 0.25, test.use = "wilcox", min.pct = 0.1, 
+                            min.diff.pct = -Inf, node = NULL, verbose = TRUE,
+                            only.pos = TRUE, max.cells.per.ident = Inf, random.seed = 1,
+                            latent.vars = NULL, min.cells.feature = 3, min.cells.group = 3,
+                            pseudocount.use = 1, return.thresh = 0.01)
+sig_genes <- mutate(sig_genes,pct.diff=pct.1-pct.2)
+# sig_genes$TF <- "no"
+id <- intersect(annotLookup2$mgi_symbol,sig_genes$gene)
+x <- sig_genes[sig_genes$gene %in% id,]
+sig_genes$gene_biotype <- annotLookup2$gene_biotype[match(as.character(sig_genes$gene),annotLookup2$mgi_symbol)]
+sig_genes$Entrez <- annotLookup2$entrezgene[match(as.character(sig_genes$gene),annotLookup2$mgi_symbol)]
+sig_genes$description <- annotLookup2$description[match(as.character(sig_genes$gene),annotLookup2$mgi_symbol)]
+sig_genes <- sig_genes[, c("gene","gene_biotype","Entrez","description","p_val_adj","avg_log2FC","pct.1","pct.2","pct.diff","cluster")]
+head(sig_genes)
+openxlsx::write.xlsx(sig_genes,"Craniofacial-scRNAseqManuscript/final-tables/Mouse_SigGenes_E10toE15_res0.1.xlsx")
+
+
+```
+
+dot plot of top marker genes
+```{r}
+sig_genes$cluster <- as.character(sig_genes$cluster)
+sig_genes <- sig_genes[order(as.numeric(sig_genes$cluster)),]
+sig_genes$cluster <- factor(sig_genes$cluster,levels = as.character(0:10))
+cds$RNA_snn_res.0.1 <- factor(cds$RNA_snn_res.0.1,levels=0:10)
+Idents(cds) <- cds$RNA_snn_res.0.1
+top <- sig_genes %>% filter(p_val_adj<0.05,gene_biotype=="protein_coding") %>% group_by(cluster) %>% top_n(50, avg_log2FC) %>% top_n(5, pct.diff);top
+p <- DotPlot(object = cds, features = unique(top$gene),group.by = "RNA_snn_res.0.1")+ coord_flip()+ RotatedAxis()
+df <- data.frame(Gene = p$data$features.plot, avg.exp = p$data$avg.exp.scaled, pct.exp = p$data$pct.exp, cluster = p$data$id)
+
+p2 <- df %>% 
+  filter(avg.exp > 0, pct.exp > 1) %>% 
+  ggplot(aes(x=cluster, y = Gene, color = avg.exp, size = pct.exp)) + 
+  geom_point() +
+  scale_color_viridis_c() + 
+  cowplot::theme_cowplot() + 
+  theme(axis.line  = element_blank()) +
+  theme(axis.text.x = element_text(angle = 0, vjust = 0.5, hjust=1)) +
+  # ylab('') + xlab("")+
+  theme(axis.ticks = element_blank()) 
+p2
+
+out <- DotPlot_scCustom(seurat_object = cds, features = unique(top$gene), colors_use = viridis_plasma_dark_high,flip_axes=T,
+                         remove_axis_titles = T,x_lab_rotate = T) + theme(axis.text.x = element_text(size = 10),axis.text.y = element_text(size = 6, face = "italic"))
+out
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_NoNeur_Res0.1_markergenes_dotplot.pdf",width=8.5,height=8.5)
+out
+dev.off()
+
+```
+
+
+Annotating major cell types
+```{r}
+Idents(cds) <- cds$RNA_snn_res.0.1
+
+# ectoderm - cluster 1,9
+FeaturePlot(cds,str_to_sentence(c("GRHL2", "ESRP1","EPCAM")),label=T)
+
+#mesenchyme - clusters 0,6,8
+FeaturePlot(cds,str_to_sentence(c("PDGFRA", "TWIST1", "PRRX1","ALX1")),label=T)
+
+#erythrocyte - cluster 3
+FeaturePlot(cds,str_to_sentence(c("SPTA1", "ALAS2", "RHAG")),label=T)
+
+#Endothelium - cluster 2
+FeaturePlot(cds,str_to_sentence(c("KDR", "FLT1")),label=T)
+
+# Immune - cluster 7
+FeaturePlot(cds,str_to_sentence(c("PTPRC", "CD86", "MST1R")),label=T)
+
+# SOX2-_SOX10+ - cluster 5
+FeaturePlot(cds,str_to_sentence(c("CDH19", "INSC", "MMP17", "FOXD3","SOX10")),label=T)
+
+# muscle - cluster 4
+FeaturePlot(cds,str_to_sentence(c("MYOG", "MYL1", "MYH3","MYF5","MYF6")),label=T)
+
+
+```
+```{r}
+cds <- RenameIdents(cds,  c("0"="mesenchyme","1"="ectoderm","2"="endothelium","3"="erythrocytes","4"="muscle","5"="SOX2-_SOX10+","6"="mesenchyme","7"="immune","8"="mesenchyme","9"="ectoderm"))
+levels(cds) <- c("mesenchyme","ectoderm","muscle","erythrocytes","endothelium","SOX2-_SOX10+","immune")
+DimPlot(cds,label=T)
+cds$cell_type1 <- Idents(cds)
+```
+
+
+```{r}
+Idents(cds) <- cds$RNA_snn_res.0.1
+p3 <- FeaturePlot(cds,str_to_sentence(c("ALX1", "EPCAM", "CDH5", "FCER1G","SPTA1","SOX10")),label=F, combine = F) #, "SOX2"
+for(i in 1:length(p3)) {
+  p3[[i]] <- p3[[i]] + NoAxes()
+}
+
+p4 <- cowplot::plot_grid(plotlist = p3)
+p4
+```
+
+```{r}
+p1 <- DimPlot_scCustom(cds,group.by = "cell_type1",colors_use = hue_pal()(length(unique(cds$cell_type1))),
+                       label=T,label.box=T,repel=T) +
+  scale_fill_manual(values = rep("white",length(unique(cds$cell_type1)))) + NoLegend()
+p1
+
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse-NoNeur-Celltype-FeaturePlots.pdf",width=11,height=8.5)
+p4
+p1
+FeaturePlot(cds,str_to_sentence(c("GRHL2", "ESRP1","EPCAM")),label=F)
+FeaturePlot(cds,str_to_sentence(c("SPTA1", "ALAS2", "RHAG")),label=F)
+FeaturePlot(cds,str_to_sentence(c("KDR", "FLT1")),label=F)
+FeaturePlot(cds,str_to_sentence(c("PTPRC", "CD86")),label=F)
+FeaturePlot(cds,str_to_sentence(c("CDH19", "INSC", "MMP17", "FOXD3","SOX10")),label=F)
+FeaturePlot(cds,str_to_sentence(c("MYOG", "MYL1", "MYH3","MYF5","MYF6")),label=F)
+dev.off()
+```
+
+```{r}
+jpeg("Craniofacial-scRNAseqManuscript/final-figs/Mouse-NoNeur-Celltype-FeaturePlots.jpg",width=11,height=8.5,units="in",res=300)
+p4
+dev.off()
+
+jpeg("Craniofacial-scRNAseqManuscript/final-figs/Mouse-NoNeur-Celltype-DimPlot.jpg",width=11,height=8.5,units="in",res=300)
+p1
+dev.off()
+```
+
+stacked VlnPlot of relevant genes
+```{r}
+
+p1 <- Stacked_VlnPlot(cds, str_to_sentence(c("PDGFRA", "PRRX1","GRHL2", "ESRP1","EPCAM","Musk","Mybpc1","SPTA1", "ALAS2", "RHAG","KDR", "FLT1","CDH19", "INSC","SOX10","PTPRC", "CD86")),group.by = "cell_type1",x_lab_rotate = 45,colors_use = hue_pal()(length(levels(cds$cell_type1))))
+p1
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_main_celltype_markers_stackedVlnplot.pdf",height=11, width=8)
+p1
+dev.off()
+```
+
+
+```{r}
+
+p <- clustree(cds, prefix = "RNA_snn_res.")
+p
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse-NoNeur-clustree.pdf",width=11,height=8.5)
+p
+dev.off()
+```
+
+
+find marker genes for main cell types
+```{r}
+#find marker genes for major cell types
+Idents(cds) <-  cds$cell_type1
+sig_genes <- FindAllMarkers(cds, assay = "RNA" ,logfc.threshold = 0.25, test.use = "wilcox", min.pct = 0.1, 
+                            min.diff.pct = -Inf, node = NULL, verbose = TRUE,
+                            only.pos = TRUE, max.cells.per.ident = Inf, random.seed = 1,
+                            latent.vars = NULL, min.cells.feature = 3, min.cells.group = 3,
+                            pseudocount.use = 1, return.thresh = 0.01)
+sig_genes <- mutate(sig_genes,pct.diff=pct.1-pct.2)
+# sig_genes$TF <- "no"
+id <- intersect(annotLookup2$mgi_symbol,sig_genes$gene)
+x <- sig_genes[sig_genes$gene %in% id,]
+sig_genes$gene_biotype <- annotLookup2$gene_biotype[match(as.character(sig_genes$gene),annotLookup2$mgi_symbol)]
+sig_genes$Entrez <- annotLookup2$entrezgene[match(as.character(sig_genes$gene),annotLookup2$mgi_symbol)]
+sig_genes$description <- annotLookup2$description[match(as.character(sig_genes$gene),annotLookup2$mgi_symbol)]
+sig_genes <- sig_genes[, c("gene","gene_biotype","Entrez","description","p_val_adj","avg_log2FC","pct.1","pct.2","pct.diff","cluster")]
+head(sig_genes)
+openxlsx::write.xlsx(sig_genes,"Craniofacial-scRNAseqManuscript/final-tables/Mouse_SigGenes_E10toE15_MainCellTypes.xlsx")
+
+```
+
+plot top genes
+```{r}
+top <- sig_genes %>% filter(p_val_adj<0.05,gene_biotype=="protein_coding") %>% group_by(cluster) %>% top_n(50, avg_log2FC) %>% top_n(5, pct.diff);top
+p <- DotPlot(object = cds, features = unique(top$gene),group.by="cell_type1")+ coord_flip()+ RotatedAxis()
+df <- data.frame(Gene = p$data$features.plot, avg.exp = p$data$avg.exp.scaled, pct.exp = p$data$pct.exp, cluster = p$data$id)
+
+p2 <- df %>% 
+  filter(avg.exp > 0, pct.exp > 1) %>% 
+  ggplot(aes(x=cluster, y = Gene, color = avg.exp, size = pct.exp)) + 
+  geom_point() +
+  scale_color_viridis_c() + 
+  cowplot::theme_cowplot() + 
+  theme(axis.line  = element_blank()) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+  ylab('') + xlab("")+
+  theme(axis.ticks = element_blank()) 
+p2
+
+out <- DotPlot_scCustom(seurat_object = cds, features = unique(top$gene), colors_use = viridis_plasma_dark_high,flip_axes=T,
+                         remove_axis_titles = T,x_lab_rotate = T) + theme(axis.text.x = element_text(size = 10),axis.text.y = element_text(size = 6, face = "italic"), legend.position = "bottom",legend.justification = "center", legend.title = element_text(size = 10, hjust=0.5),legend.text = element_text(size = 10))+guides(color = guide_colorbar(title.position = "top",title = "Average Expression"),size = guide_legend(title.position = "top",title = "Percent Expressed")) 
+out
+
+
+
+```
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_NoNeur_MainCellTypes_markergenes_dotplot.pdf",width=8.5,height=8.5)
+out
+dev.off()
+
+```
+
+
+CNCC module score
+```{r}
+# CNCC module score doi: 10.1242/dev.105445
+# https://www.sigmaaldrich.com/US/en/product/mm/scc049
+# https://www.liebertpub.com/doi/pdf/10.1089/scd.2012.0155
+cnccMarkers <- c("Sox10","Foxd3","Lmo4","Sox5","Sox6","Tfap2a","Ebf1","Pax3", "Rxrg","Twist1", "Myc", "Ets1", "Cald1","Rac1","Cfl1", "Crabp1", "Epha2","Itgb1", "Cd44",
+                 "Dlx1", "Dlx2","Dlx5", "Dlx6","Sox9","Id1","Id2","Id3","Id4","Myc","Myb","Mef2c")
+p1 <- Stacked_VlnPlot(cds, c("Sox10","Foxd3","Lmo4","Sox5","Sox6","Tfap2a","Ebf1","Pax3", "Rxrg","Twist1", "Myc", "Ets1", "Cald1","Rac1","Cfl1", "Crabp1", "Epha2","Itgb1", "Cd44",
+                   "Dlx1", "Dlx2","Dlx5", "Dlx6","Sox9","Id1","Id2","Id3","Id4","Myc","Myb","Mef2c"),group.by="cell_type1")
+
+cds <- AddModuleScore(cds, list(cnccMarkers),name = "CNCC_ModuleScore" )
+p2 <- FeaturePlot(cds, "CNCC_ModuleScore1",cols = c("grey90","red"))+NoAxes()
+p3 <- VlnPlot_scCustom(cds, "CNCC_ModuleScore1",plot_median = T,group.by="cell_type1",pt.size=0)+NoLegend()
+
+CNCC_data <- as.numeric(cds$CNCC_ModuleScore1[which(cds$cell_type1=="SOX2-_SOX10+")])
+
+cncc_vs_all <- wilcox.test(x=CNCC_data, y = as.numeric(cds$CNCC_ModuleScore1[which(cds$cell_type1!="SOX2-_SOX10+")]), alternative="greater")
+  
+print(cncc_vs_all)
+
+p4 <- p3 + ylim(c(-0.5,1.25)) + 
+   geom_text(
+  aes(x = "SOX2-_SOX10+", y = max(cds$CNCC_ModuleScore1) + 0.25),
+  label = "* * *",angle=90,
+  size = 6,  # Adjust size of the asterisk
+  color = "black"  # Optional: Customize color
+) + coord_flip()
+
+
+```
+
+```{r}
+p1
+p2
+p3
+p4
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_CNCC_ModuleScore_Plots.pdf",w=8.5,h=11)
+p1
+p2
+p3
+p4
+dev.off()
+
+```
+
+DimPlots for relevant annotations
+```{r}
+stage_colors <- viridis_plasma_dark_high[match(1:6,cut(1:length(viridis_plasma_dark_high), breaks = 6,labels=1:6))]
+names(stage_colors) <- levels(cds$stage)
+
+p1 <-  DimPlot(cds, group.by="orig.ident",label=F)
+
+p2 <-  DimPlot_scCustom(cds, group.by="stage",colors_use = stage_colors,label=F) +
+  scale_fill_manual(values = rep("white",length(unique(cds$stage))))
+
+p3 <-  DimPlot_scCustom(cds, group.by="RNA_snn_res.0.1",colors_use = hue_pal()(length(unique(cds$RNA_snn_res.0.1))),
+                          label=T,label.box=T,repel=T) + 
+  scale_fill_manual(values = rep("white",length(unique(cds$RNA_snn_res.0.1)))) + NoLegend()
+
+p4 <-  DimPlot_scCustom(cds, group.by="cell_type1",colors_use = hue_pal()(length(unique(cds$cell_type1))),
+                          label=T,label.box=T,repel=T) + 
+  scale_fill_manual(values = rep("white",length(unique(cds$cell_type1)))) + NoLegend()
+
+p1
+p2
+p3
+p4
+
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_UMAP_DimPlots.pdf",w=11,h=8.5)
+p1
+p2
+p3
+p4
+dev.off()
+```
+
+BarPlots by Stage and Cell Type
+```{r}
+mouse_celltype_colors <- hue_pal()(length(levels(cds$cell_type1)))
+names(mouse_celltype_colors) <- levels(cds$cell_type1)
+
+p1 <- SCpubr::do_BarPlot(cds, 
+                   group.by = "stage",
+                   split.by = "cell_type1",
+                   position = "fill",
+                   flip = FALSE, 
+                   legend.position = "right",
+                   colors.use = stage_colors,add.n = T)
+p1
+
+p2 <- SCpubr::do_BarPlot(cds, 
+                   group.by = "stage",
+                   split.by = "cell_type1",
+                   position = "stack",
+                   flip = FALSE,
+                   legend.position = "right",
+                   colors.use = stage_colors)
+p2
+
+
+p3 <- SCpubr::do_BarPlot(cds, 
+                   group.by = "cell_type1",
+                   split.by = "stage",
+                   position = "fill",
+                   flip = FALSE, 
+                   legend.position = "right",
+                   colors.use = mouse_celltype_colors)
+p3
+
+p4 <- SCpubr::do_BarPlot(cds, 
+                   group.by = "cell_type1",
+                   split.by = "stage",
+                   position = "stack",
+                   flip = FALSE, 
+                   legend.position = "right",
+                   colors.use = mouse_celltype_colors)
+p4
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_main_celltypes_stage_barplot.pdf",width=11,height=8.5)
+p1
+p2
+p3
+p4
+dev.off()
+```
+
+mouse pseudobulk by cell type
+```{r}
+mouse_pseudobulk <- AggregateExpression(cds,group.by="cell_type1",return.seurat = T)
+
+celltype_markers <- c("Alx1","Twist1","Epcam","Myog","Hemgn","Cdh5","Sox10","Foxd3","Fcer1g")
+colnames(mouse_pseudobulk)[which(colnames(mouse_pseudobulk)=="SOX2--SOX10+")] <- "SOX2-_SOX10+"
+
+newnames <- lapply(
+  celltype_markers,
+  function(x) bquote(italic(.(x))))
+
+col_annotations <- data.frame(celltype=colnames(mouse_pseudobulk))
+rownames(col_annotations) <- col_annotations$celltype
+
+ann_colors = list(celltype = hue_pal()(ncol(mouse_pseudobulk)))
+names(ann_colors$celltype) <- levels(cds$cell_type1)
+
+pheatmap(as.matrix(mouse_pseudobulk@assays$RNA$scale.data)[match(celltype_markers,rownames(mouse_pseudobulk)),],cluster_rows = F,
+         cluster_cols = F,angle_col=45, main="Mouse - Cell Type Marker Genes",fontsize = 12,labels_row = as.expression(newnames),
+         annotation_col = col_annotations,annotation_colors = ann_colors,annotation_legend = F)
+
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_Celltype_Pseudobulk_MarkerGenes_Heatmap.pdf",height=8.5,width=11)
+pheatmap(as.matrix(mouse_pseudobulk@assays$RNA$scale.data)[match(celltype_markers,rownames(mouse_pseudobulk)),],cluster_rows = F,
+         cluster_cols = F,angle_col=45, main="Mouse - Cell Type Marker Genes",fontsize = 12,labels_row = as.expression(newnames),
+         annotation_col = col_annotations,annotation_colors = ann_colors,annotation_legend = F)
+dev.off()
+```
+
+
+Updating subtypes
+```{r}
+
+mcncc <- readRDS("mcncc_final.rds")
+
+colnames_tomatch <- paste0(cds$orig.ident,"-",strsplit2(colnames(cds),split="-")[,1])
+
+cds$subtype <- as.character(cds$annotation)
+cds$subtype[which(cds$subtype=="red blood cells")] <- "erythrocytes"
+cds$subtype[which(cds$subtype=="other blood cells")] <- "immune"
+
+
+cds$subtype[which(cds$cell_type1=="SOX2-_SOX10+")] <- as.character(mcncc$subtype_final[match(colnames_tomatch[which(cds$cell_type1=="SOX2-_SOX10+")] ,paste0(mcncc$orig.ident,"-",strsplit2(colnames(mcncc),split="-")[,1]))])
+
+# saveRDS(cds,"face_mouse_final.rds")
+```
+

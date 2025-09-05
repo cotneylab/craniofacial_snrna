@@ -1,0 +1,1762 @@
+---
+title: "CNCC subclustering and annotation"
+output: html_document
+date: "2025-04-06"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = "/scr1/users/manchela/Data") 
+library(Seurat)
+library(SeuratDisk)
+library(tidyverse)
+library(harmony)
+library(dplyr)
+library(patchwork)
+library(viridis)
+library(ggforce)
+library(gghalves)
+library(ggridges)
+library(scCustomize)
+library(SCpubr)
+library(dplyr)
+library(DropletUtils)
+library(biomaRt)
+library(limma)
+library(pheatmap)
+library(grid)
+library(openxlsx)
+library(clusterProfiler)
+library(enrichplot)
+library(org.Hs.eg.db)
+library(AnnotationHub)
+library(ReactomePA)
+library(DOSE)
+library(orthogene)
+library(factoextra)
+library(smerc)
+library(Rfast)
+library(GeneOverlap)
+library(reshape2)
+library(ggvenn)
+library(scales)
+```
+
+CNCC Subclustering
+
+```{r}
+cncc <- initial.filt_singlet_noneuro[,which(initial.filt_singlet_noneuro$celltype=="CNCC")]
+
+cncc <- NormalizeData(cncc)
+cncc <- CellCycleScoring(cncc, s.features = cc.genes$s.genes, g2m.features = cc.genes$g2m.genes, set.ident = TRUE)
+
+cncc <- FindVariableFeatures(cncc) %>% 
+  ScaleData(vars.to.regress = c("S.Score", "G2M.Score")) %>% 
+  RunPCA(verbose = FALSE) %>% 
+  RunHarmony(group.by.vars = "orig.ident")
+
+cncc <- RunUMAP(cncc, reduction = "harmony", dims = 1:30, min.dist = 0.3) %>%
+  FindNeighbors(reduction = "harmony", dims = 1:30, verbose = FALSE) %>%
+  FindClusters(resolution = c(0.2,0.4,0.6,0.8,1,2,3,4), verbose = FALSE)
+
+```
+
+```{r}
+cncc <- readRDS("human_face_cncc_cellrangerARC-raw_emptyDrops_singlets_27Mar.rds")
+
+dim(cncc)
+```
+
+
+Identify optimal number of clusters - Elbow Plot
+
+```{r}
+set.seed(123)
+x=cncc@assays$RNA$scale.data
+diss <- Rfast::Dist(as.matrix(t(x)))
+
+k.max=100
+v <- rep(0, k.max)
+for (i in 1:k.max) {
+  clust <- kmeans(x, i)
+  v[i] <- factoextra:::.get_withinSS(diss, clust$cluster)
+  cat(i)
+}
+
+
+df <- data.frame(clusters = as.factor(1:k.max), y = v, 
+                 stringsAsFactors = TRUE)
+
+```
+
+```{r}
+ylab <- "Total Within Sum of Square"
+p <- ggpubr::ggline(df, x = "clusters", y = "y", group = 1, 
+                    color = "steelblue", ylab = ylab, xlab = "Number of clusters k", 
+                    main = "CNCC: Optimal number of clusters")
+
+p <- readRDS("human_face_cncc_ElbowPlot_data_27Mar.rds")
+p + scale_x_discrete(breaks = seq(0, max(as.numeric(as.character(p$data$clusters))), by = 5))+
+  geom_vline(xintercept = elbow_point(as.numeric(p$data$clusters),as.numeric(p$data$y))$x, linetype=2)
+
+elbow_point(as.numeric(p$data$clusters),as.numeric(p$data$y))
+# x= 18 clusters
+
+apply(cncc@meta.data[,grep("RNA_snn_res",colnames(cncc@meta.data))],2,function(x) length(unique(x)))
+# choosing resolution=1 (19 clusters)
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/CNCC_Subclustering_OptimalClusters_ElbowPlot.pdf",width=11,height=8.5)
+p + scale_x_discrete(breaks = seq(0, max(as.numeric(as.character(p$data$clusters))), by = 5))+
+  geom_vline(xintercept = elbow_point(as.numeric(p$data$clusters),as.numeric(p$data$y))$x, linetype=2)
+dev.off()
+```
+
+
+Create unique color palette
+```{r}
+cncc_colors <- DiscretePalette_scCustomize(num_colors = length(unique(as.character(cncc$RNA_snn_res.1))),
+                                          palette = "ditto_seq")
+
+names(cncc_colors) <- levels(cncc$RNA_snn_res.1)
+
+cncc$color <- as.character(cncc_colors)[match(cncc$RNA_snn_res.1,names(cncc_colors))]
+cncc_plot_colors <- cncc$color 
+names(cncc_plot_colors) <- cncc$RNA_snn_res.1
+```
+
+
+```{r}
+DimPlot(cncc,group.by="orig.ident")
+DimPlot(cncc,group.by="stage")
+DimPlot_scCustom(cncc,group.by="RNA_snn_res.1",label=T,colors_use = cncc_plot_colors)
+```
+
+```{r}
+
+pdf("Craniofacial-scRNAseqManuscript/final-figs/CNCC_subclustering_Dimplots.pdf",width=11,height=8.5)
+DimPlot(cncc,group.by="orig.ident")
+DimPlot(cncc,group.by="stage")
+DimPlot_scCustom(cncc,group.by="RNA_snn_res.1",label=T,colors_use = cncc_plot_colors)
+dev.off()
+```
+
+
+Melanocyte Markers
+```{r}
+# Identifying melanocytes: cluster 16
+Stacked_VlnPlot(cncc,c("MITF","PMEL"),pt.size=0,group.by="RNA_snn_res.1",colors_use = cncc_plot_colors) + NoLegend()
+
+cncc$subtype_function <- rep(0,ncol(cncc))
+cncc$subtype_function[which(cncc$RNA_snn_res.1==16)] <- "melanocytes"
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/CNCC_Res1Clusters_MelanocyteMarkers_VlnPlot.pdf",width=11,height=8.5)
+Stacked_VlnPlot(cncc,c("MITF","PMEL"),pt.size=0,group.by="RNA_snn_res.1",colors_use = cncc_plot_colors) + NoLegend()
+dev.off()
+```
+
+
+
+Identifying Cell cycle biased CNCC's
+```{r}
+VlnPlot_scCustom(cncc,features="G2M.Score",plot_median = T,pt.size=0,group.by="RNA_snn_res.1", colors_use = cncc_plot_colors) + NoLegend() +
+  geom_hline(yintercept=median(cncc$G2M.Score),linetype=2)
+
+VlnPlot_scCustom(cncc,features="S.Score",plot_median = T,pt.size=0,group.by="RNA_snn_res.1", colors_use = cncc_plot_colors) + NoLegend() +
+  geom_hline(yintercept=median(cncc$S.Score),linetype=2)
+
+# cluster 10 and 14 are cycling CNCCs
+
+cncc$subtype_function[which(cncc$RNA_snn_res.1==10)] <- "cycling.CNCC.1"
+cncc$subtype_function[which(cncc$RNA_snn_res.1==14)] <- "cycling.CNCC.2"
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/CNCC_Res1Clusters_CellCycleMarkers_VlnPlot.pdf",width=11,height=8.5)
+VlnPlot_scCustom(cncc,features="G2M.Score",plot_median = T,pt.size=0,group.by="RNA_snn_res.1", colors_use = cncc_plot_colors) + NoLegend() +
+  geom_hline(yintercept=median(cncc$G2M.Score),linetype=2)
+
+VlnPlot_scCustom(cncc,features="S.Score",plot_median = T,pt.size=0,group.by="RNA_snn_res.1", colors_use = cncc_plot_colors) + NoLegend() +
+  geom_hline(yintercept=median(cncc$S.Score),linetype=2)
+dev.off()
+```
+
+
+Identifying functionally specific CNCC's using markers from Soldatov et al 2019 (DOI: 10.1126/science.aas9536)
+```{r}
+soldatov_markers <- read.table("soldatov_trunk_cncc_markers.csv",sep=",",header=T)
+soldatov_markers <- soldatov_markers[,-c(15:18)]
+annotLookup_ortho_one2one <- orthogene::convert_orthologs(rownames(mcncc),input_species="mouse",output_species = "human",
+                                                          non121_strategy = "drop_both_species", method="gprofiler") 
+
+soldatov_markers$hs_gene <- rownames(annotLookup_ortho_one2one)[match(soldatov_markers$X,annotLookup_ortho_one2one$input_gene)]
+soldatov_markers <- soldatov_markers[-which(is.na(soldatov_markers$hs_gene)),]
+
+cncc <- AddModuleScore(cncc,list(soldatov_markers$hs_gene[which(soldatov_markers$Celltype=="neural.tube")]),name="NeuralTube_ModuleScore")
+cncc <- AddModuleScore(cncc,list(soldatov_markers$hs_gene[which(soldatov_markers$Celltype=="pre.delaminatory")]),name="Pre.Delam_ModuleScore")
+cncc <- AddModuleScore(cncc,list(soldatov_markers$hs_gene[which(soldatov_markers$Celltype=="delaminatory")]),name="Delam_ModuleScore")
+cncc <- AddModuleScore(cncc,list(soldatov_markers$hs_gene[which(soldatov_markers$Celltype=="eary.migration")]),name="EarlyMigration_ModuleScore")
+cncc <- AddModuleScore(cncc,list(soldatov_markers$hs_gene[which(soldatov_markers$Celltype=="migration1")]),name="Migration1_ModuleScore")
+cncc <- AddModuleScore(cncc,list(soldatov_markers$hs_gene[which(soldatov_markers$Celltype=="migration2")]),name="Migration2_ModuleScore")
+cncc <- AddModuleScore(cncc,list(soldatov_markers$hs_gene[which(soldatov_markers$Celltype=="sensory")]),name="Sensory_ModuleScore")
+cncc <- AddModuleScore(cncc,list(soldatov_markers$hs_gene[which(soldatov_markers$Celltype=="autonomic")]),name="Autonomic_ModuleScore")
+cncc <- AddModuleScore(cncc,list(soldatov_markers$hs_gene[which(soldatov_markers$Celltype=="mesenchymal")]),name="Mesenchymal_ModuleScore")
+
+p1 <- VlnPlot_scCustom(cncc,features="NeuralTube_ModuleScore1",plot_median = T,pt.size=0,group.by="RNA_snn_res.1", colors_use = cncc_plot_colors) + NoLegend() +
+  geom_hline(yintercept=median(cncc$NeuralTube_ModuleScore1))
+p2 <- VlnPlot_scCustom(cncc,features="Pre.Delam_ModuleScore1",plot_median = T,pt.size=0,group.by="RNA_snn_res.1", colors_use = cncc_plot_colors) + NoLegend() +
+  geom_hline(yintercept=median(cncc$Pre.Delam_ModuleScore1))
+p3 <- VlnPlot_scCustom(cncc,features="Delam_ModuleScore1",plot_median = T,pt.size=0,group.by="RNA_snn_res.1", colors_use = cncc_plot_colors) + NoLegend() +
+  geom_hline(yintercept=median(cncc$Delam_ModuleScore1))
+p4 <- VlnPlot_scCustom(cncc,features="EarlyMigration_ModuleScore1",plot_median = T,pt.size=0,group.by="RNA_snn_res.1", colors_use = cncc_plot_colors) + NoLegend() +
+  geom_hline(yintercept=median(cncc$EarlyMigration_ModuleScore1))
+p5 <- VlnPlot_scCustom(cncc,features="Migration1_ModuleScore1",plot_median = T,pt.size=0,group.by="RNA_snn_res.1", colors_use = cncc_plot_colors) + NoLegend() +
+  geom_hline(yintercept=median(cncc$Migration1_ModuleScore1))
+p6 <- VlnPlot_scCustom(cncc,features="Migration2_ModuleScore1",plot_median = T,pt.size=0,group.by="RNA_snn_res.1", colors_use = cncc_plot_colors) + NoLegend() +
+  geom_hline(yintercept=median(cncc$Migration2_ModuleScore1))
+p7 <- VlnPlot_scCustom(cncc,features="Sensory_ModuleScore1",plot_median = T,pt.size=0,group.by="RNA_snn_res.1", colors_use = cncc_plot_colors) + NoLegend() +
+  geom_hline(yintercept=median(cncc$Sensory_ModuleScore1))
+p8 <- VlnPlot_scCustom(cncc,features="Autonomic_ModuleScore1",plot_median = T,pt.size=0,group.by="RNA_snn_res.1", colors_use = cncc_plot_colors) + NoLegend() +
+  geom_hline(yintercept=median(cncc$Autonomic_ModuleScore1))
+p9 <- VlnPlot_scCustom(cncc,features="Mesenchymal_ModuleScore1",plot_median = T,pt.size=0,group.by="RNA_snn_res.1", colors_use = cncc_plot_colors) + NoLegend() +
+  geom_hline(yintercept=median(cncc$Mesenchymal_ModuleScore1))
+
+p1
+p2
+p3
+p4
+p5
+p6
+p7
+p8
+p9
+
+# Cluster    15  neural.tube   40
+# Cluster     2  mesenchymal  337
+# Cluster    13      sensory   70
+
+cncc$subtype_function[which(cncc$RNA_snn_res.1==15)] <- "ncl1" # neural tube-like
+cncc$subtype_function[which(cncc$RNA_snn_res.1==2)] <- "mesenchymal.CNCC"
+cncc$subtype_function[which(cncc$RNA_snn_res.1==13)] <- "sensory.CNCC"
+```
+
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/CNCC_Res1Clusters_CNCCTrunkMarkers_Soldatov2019_VlnPlot.pdf",width=11,height=8.5)
+p1
+p2
+p3
+p4
+p5
+p6
+p7
+p8
+p9
+dev.off()
+```
+
+```{r}
+p <- VlnPlot_scCustom(cncc,features=c("Mesenchymal_ModuleScore1","Sensory_ModuleScore1"),plot_median = T,pt.size=0,group.by="RNA_snn_res.1", colors_use = cncc_plot_colors,num_columns = 1) + NoLegend()
+
+p
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/CNCC_Res1Clusters_Soldatov2019_Mes-Sensory_ModScores_VlnPlot.pdf",width=11,height=8.5)
+p
+dev.off()
+```
+
+
+Identifying functionally specific cranial CNCC's using markers from Soldatov et al 2019 (DOI: 10.1126/science.aas9536)
+
+```{r}
+soldatov_cranial_markers <- read.table("soldatov_cranial_cncc_markers.csv",sep=",",header=T)
+soldatov_cranial_markers$hs_gene <- rownames(annotLookup_ortho_one2one)[match(soldatov_cranial_markers$X,annotLookup_ortho_one2one$input_gene)]
+soldatov_cranial_markers <- soldatov_cranial_markers[-which(is.na(soldatov_cranial_markers$hs_gene)),]
+
+cncc <- AddModuleScore(cncc,list(c(soldatov_cranial_markers$hs_gene[which(soldatov_cranial_markers$Cluster==6 & soldatov_cranial_markers$OR>2)],"HOXB2")),name="HOXB_ModuleScore")
+cncc <- AddModuleScore(cncc,list(c(soldatov_cranial_markers$hs_gene[which(soldatov_cranial_markers$Cluster==1 & soldatov_cranial_markers$OR>2)])),name="HOXNeg_ModuleScore")
+cncc <- AddModuleScore(cncc,list(c(soldatov_cranial_markers$hs_gene[which(soldatov_cranial_markers$Cluster==2 & soldatov_cranial_markers$OR>2)])),name="EarlyHOX_ModuleScore")
+cncc <- AddModuleScore(cncc,list(c(soldatov_cranial_markers$hs_gene[which(soldatov_cranial_markers$Cluster==3 & soldatov_cranial_markers$OR>2)])),name="LateHOX_ModuleScore")
+cncc <- AddModuleScore(cncc,list(c(soldatov_cranial_markers$hs_gene[which(soldatov_cranial_markers$Cluster==4 & soldatov_cranial_markers$OR>2)])),name="HOXNeg_NT1_ModuleScore")
+cncc <- AddModuleScore(cncc,list(c(soldatov_cranial_markers$hs_gene[which(soldatov_cranial_markers$Cluster==5 & soldatov_cranial_markers$OR>2)])),name="Placode_ModuleScore")
+cncc <- AddModuleScore(cncc,list(c(soldatov_cranial_markers$hs_gene[which(soldatov_cranial_markers$Cluster==7 & soldatov_cranial_markers$OR>2)])),name="HOXNeg_NT2_ModuleScore")
+cncc <- AddModuleScore(cncc,list(c(soldatov_cranial_markers$hs_gene[which(soldatov_cranial_markers$Cluster==8 & soldatov_cranial_markers$OR>2)])),name="HOXNeg_NT3_ModuleScore")
+cncc <- AddModuleScore(cncc,list(c(soldatov_cranial_markers$hs_gene[which(soldatov_cranial_markers$Cluster==11 & soldatov_cranial_markers$OR>2)])),name="HOXD3_ModuleScore")
+
+p1 <- Stacked_VlnPlot(cncc,c("HOXB1","HOXB2","HOXB_ModuleScore1"),group.by="RNA_snn_res.1",pt.size=0, colors_use = cncc_plot_colors)+NoLegend()
+p2 <- VlnPlot_scCustom(cncc,c("HOXNeg_ModuleScore1"),group.by="RNA_snn_res.1",pt.size=0,plot_median = T, colors_use = cncc_plot_colors)+NoLegend()
+p3 <- VlnPlot_scCustom(cncc,c("EarlyHOX_ModuleScore1"),group.by="RNA_snn_res.1",pt.size=0,plot_median = T, colors_use = cncc_plot_colors)+NoLegend()
+p4 <- VlnPlot_scCustom(cncc,c("LateHOX_ModuleScore1"),group.by="RNA_snn_res.1",pt.size=0,plot_median = T, colors_use = cncc_plot_colors)+NoLegend()
+p5 <- VlnPlot_scCustom(cncc,c("Placode_ModuleScore1"),group.by="RNA_snn_res.1",pt.size=0,plot_median = T, colors_use = cncc_plot_colors)+NoLegend()
+
+p1
+p2
+p3
+p4
+p5
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/CNCC_Res1Clusters_CNCCCranialMarkers_Soldatov2019_VlnPlot.pdf",width=11,height=8.5)
+p1
+p2
+p3
+p4
+p5
+dev.off()
+```
+
+CNCCs vs. plausible Schwann cells
+```{r}
+#Schwann cell markers from Cao et al 2020 (DOI: 10.1126/science.aba7721)
+schwann_cell_markers <- read.table("/scr1/users/manchela/Data/GSE156793_S8_DE_gene_cells.csv",sep=",",header=1)
+schwann_cell_markers <- schwann_cell_markers[which(schwann_cell_markers$max.cluster=="Schwann cells"),]
+schwann_cell_markers <- schwann_cell_markers[which(schwann_cell_markers$qval<0.05),]
+
+cncc <- AddModuleScore(cncc,features=list(unique(schwann_cell_markers$gene_short_name)),name="Schwann_ModuleScore")
+
+p1 <- VlnPlot_scCustom(cncc,features="Schwann_ModuleScore1",plot_median = T,pt.size=0,group.by="RNA_snn_res.1",colors_use = cncc_plot_colors) + NoLegend() +
+  geom_hline(yintercept=median(cncc$Schwann_ModuleScore1), linetype=2)
+p1
+# Schwann cell clusters: 3,4,6,7,9,12
+cncc$subtype_function[which(cncc$RNA_snn_res.1==3)] <- "schwann.1"
+cncc$subtype_function[which(cncc$RNA_snn_res.1==4)] <- "schwann.2"
+cncc$subtype_function[which(cncc$RNA_snn_res.1==6)] <- "schwann.3"
+cncc$subtype_function[which(cncc$RNA_snn_res.1==7)] <- "schwann.4"
+cncc$subtype_function[which(cncc$RNA_snn_res.1==9)] <- "schwann.5"
+cncc$subtype_function[which(cncc$RNA_snn_res.1==12)] <- "schwann.6"
+
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/CNCC_Res1Clusters_SchwannMarkers_Cao2020_VlnPlot.pdf",width=11,height=8.5)
+p1
+dev.off()
+```
+
+```{r}
+DimPlot(cncc,group.by="subtype_function",label=T) + NoLegend()
+```
+
+
+Bar plots after downsampling
+```{r}
+stage_colors <- viridis_plasma_dark_high[match(1:6,cut(1:length(viridis_plasma_dark_high), breaks = 6,labels=1:6))]
+names(stage_colors) <- levels(initial.filt_singlet$stage)
+
+# downsample cncc object so each stage has ~ 200 cells to identify stage bias in each cluster
+Idents(cncc) <- cncc$stage
+cncc_stage_downsample <- subset(cncc,downsample=200)
+
+p1 <- SCpubr::do_BarPlot(cncc_stage_downsample, 
+                   group.by = "stage",
+                   split.by = "RNA_snn_res.1",
+                   position = "fill",
+                   flip = FALSE, 
+                   legend.position = "right",
+                   colors.use = stage_colors)
+p1
+
+p2 <- SCpubr::do_BarPlot(cncc_stage_downsample, 
+                   group.by = "stage",
+                   split.by = "RNA_snn_res.1",
+                   position = "stack",
+                   flip = FALSE, 
+                   legend.position = "right",
+                   colors.use = stage_colors)
+p2
+
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/CNCC_Res1Clusters_stage_barplot.pdf",width=11,height=8.5)
+p1
+p2
+dev.off()
+```
+
+```{r}
+
+
+# Cluster 0:   early.CNCC  393
+# Cluster 17: early.CNCC.1   23
+# Cluster 5: early.CNCC.2  269
+# Cluster: 8     int.CNCC  193
+# Cluster: 10   int.CNCC.1  124
+# Cluster: 11   int.CNCC.2   88
+# Cluster: 1   int.CNCC.3  358
+# Cluster: 4   int.CNCC.4  294
+# Cluster: 14   int.CNCC.5   67
+# Cluster    13      int.CNCC.6   70
+# Cluster    15  int.CNCC.7   40
+# Cluster    16  int.CNCC.8   39
+# Cluster    2  int.CNCC.9   337
+# Cluster: 9    late.CNCC  177
+# Cluster: 3  late.CNCC.1  299
+# Cluster: 7  late.CNCC.2  209
+# Cluster: 6  late.CNCC.3  211
+# Cluster: 12 late.CNCC.4  85
+# Cluster: 18 late.CNCC.5  18
+
+cncc$subtype_stage <- rep(0,ncol(cncc))
+cncc$subtype_stage[which(cncc$RNA_snn_res.1==0)] <- "early.CNCC"
+cncc$subtype_stage[which(cncc$RNA_snn_res.1==1)] <- "int.CNCC.3"
+cncc$subtype_stage[which(cncc$RNA_snn_res.1==2)] <- "int.CNCC.9"
+cncc$subtype_stage[which(cncc$RNA_snn_res.1==3)] <- "late.CNCC.1"
+cncc$subtype_stage[which(cncc$RNA_snn_res.1==4)] <- "int.CNCC.4"
+cncc$subtype_stage[which(cncc$RNA_snn_res.1==5)] <- "early.CNCC.2"
+cncc$subtype_stage[which(cncc$RNA_snn_res.1==6)] <- "late.CNCC.3"
+cncc$subtype_stage[which(cncc$RNA_snn_res.1==7)] <- "late.CNCC.2"
+cncc$subtype_stage[which(cncc$RNA_snn_res.1==8)] <- "int.CNCC"
+cncc$subtype_stage[which(cncc$RNA_snn_res.1==9)] <- "late.CNCC"
+cncc$subtype_stage[which(cncc$RNA_snn_res.1==10)] <- "int.CNCC.1"
+cncc$subtype_stage[which(cncc$RNA_snn_res.1==11)] <- "int.CNCC.2"
+cncc$subtype_stage[which(cncc$RNA_snn_res.1==12)] <- "late.CNCC.4"
+cncc$subtype_stage[which(cncc$RNA_snn_res.1==13)] <- "int.CNCC.6"
+cncc$subtype_stage[which(cncc$RNA_snn_res.1==14)] <- "int.CNCC.5"
+cncc$subtype_stage[which(cncc$RNA_snn_res.1==15)] <- "int.CNCC.7"
+cncc$subtype_stage[which(cncc$RNA_snn_res.1==16)] <- "int.CNCC.8"
+cncc$subtype_stage[which(cncc$RNA_snn_res.1==17)] <- "early.CNCC.1"
+cncc$subtype_stage[which(cncc$RNA_snn_res.1==18)] <- "late.CNCC.5"
+
+```
+
+
+
+```{r}
+unique(cncc$subtype_stage[which(cncc$subtype_function==0)])
+# [1] "early.CNCC.2" "int.CNCC.3"   "early.CNCC"   "int.CNCC"     "int.CNCC.2"   "early.CNCC.1" "late.CNCC.5" 
+cncc_plot_colors_stage <- cncc_plot_colors
+names(cncc_plot_colors_stage) <- cncc$subtype_stage
+DimPlot_scCustom(cncc,group.by="subtype_stage",label=T,colors_use = cncc_plot_colors_stage)+NoLegend()
+
+```
+
+Analyzing HOX genes
+```{r}
+anterior_hox <- c("HOXA1", "HOXA2", "HOXA3", "HOXB1", "HOXB2", "HOXB3", "HOXD1", "HOXD3")
+central_hox <- c("HOXA4", "HOXA5", "HOXA6", "HOXA7", "HOXB4", "HOXB5", "HOXB6", "HOXB7", "HOXB8", "HOXC4", "HOXC5", "HOXC6", "HOXC8", "HOXD4", "HOXD8")
+posterior_hox <-c("HOXA9", "HOXA10", "HOXA11", "HOXA13", "HOXB9", "HOXB13", "HOXC9", "HOXC10", "HOXC11", "HOXC12", "HOXC13", "HOXD9", "HOXD10", "HOXD11", "HOXD12", "HOXD13")
+
+cncc <- AddModuleScore(cncc,features=list(anterior_hox),name="Anterior_ModuleScore")
+cncc <- AddModuleScore(cncc,features=list(central_hox),name="Central_ModuleScore")
+cncc <- AddModuleScore(cncc,features=list(posterior_hox),name="Posterior_ModuleScore")
+
+p1 <- VlnPlot_scCustom(cncc,features="Anterior_ModuleScore1",plot_median = T,pt.size=0,group.by="subtype_stage") + NoLegend() +
+  geom_hline(yintercept=median(cncc$Anterior_ModuleScore1),linetype=2)
+p2 <- VlnPlot_scCustom(cncc,features="Central_ModuleScore1",plot_median = T,pt.size=0,group.by="subtype_stage") + NoLegend() +
+  geom_hline(yintercept=median(cncc$Central_ModuleScore1),linetype=2)
+p3 <- VlnPlot_scCustom(cncc,features="Posterior_ModuleScore1",plot_median = T,pt.size=0,group.by="subtype_stage") + NoLegend() +
+  geom_hline(yintercept=median(cncc$Posterior_ModuleScore1),linetype=2)
+
+p1
+p2
+p3
+```
+
+Labeling punctate clusters
+```{r}
+
+#GRHL2+ and ESRP1+
+cncc$subtype_function[which(cncc$RNA_snn_res.1==18)] <- "ncl2"
+
+# positive for ALX4
+cncc$subtype_function[which(cncc$RNA_snn_res.1==12)] <- "ncl3"
+
+
+# positive for many hemoglobin markers: "HBA2","HBA1","HBG1","HBG2","HBZ","HBE1" and metallothionein (MT) genes
+cncc$subtype_function[which(cncc$RNA_snn_res.1==17)] <- "ncl4"
+
+```
+
+```{r}
+DimPlot(cncc,group.by="RNA_snn_res.1",label=T) + NoLegend()
+DimPlot(cncc,group.by="subtype_function",label=T) + NoLegend()
+```
+
+```{r}
+
+p <- SCpubr::do_BarPlot(cncc, 
+                   group.by = "stage",
+                   split.by = "subtype_stage",
+                   position = "fill",
+                   flip = FALSE,
+                   legend.position = "right")
+p
+
+Idents(cncc) <- cncc$subtype_stage 
+DimPlot(cncc,group.by="subtype_stage",label=T) + NoLegend()
+```
+
+```{r}
+Stacked_VlnPlot(cncc,features=c("nFeature_RNA","nCount_RNA","percent.mt","SOX10"),pt.size=0,x_lab_rotate = 45,group.by="RNA_snn_res.1",colors_use = cncc_plot_colors)+NoLegend()
+
+Stacked_VlnPlot(cncc,c("HOXA1","HOXA2","HOXA3","HOXB1","HOXB2","HOXB3","HOXD1","HOXD3"),pt.size=0,group.by="RNA_snn_res.1",colors_use = cncc_plot_colors) + NoLegend()
+
+
+# cluster 11 has high percent.mt and low nFeature_RNA and low nCount_RNA
+# cluster 0 is HOXA3+.HOXB2+
+# cluster 5 is HOXA2+.HOXA3+
+```
+
+
+```{r}
+cncc$subtype_final <- as.character(cncc$subtype_function)
+unique(cncc$RNA_snn_res.1[which(cncc$subtype_function==0)])
+#  5  1  0  8  11
+as.data.frame(table(cncc$RNA_snn_res.1,cncc$subtype_stage,cncc$subtype_function)) %>%filter(Freq!=0)
+cncc$subtype_final[which(cncc$RNA_snn_res.1==0)] <- "early.CNCC.1"
+cncc$subtype_final[which(cncc$RNA_snn_res.1==5)] <- "early.CNCC.2"
+cncc$subtype_final[which(cncc$RNA_snn_res.1==8)] <- "int.CNCC.1"
+cncc$subtype_final[which(cncc$RNA_snn_res.1==1)] <- "int.CNCC.2"
+cncc$subtype_final[which(cncc$RNA_snn_res.1==11)] <- "int.CNCC.3"
+
+```
+
+```{r}
+names(cncc_colors) <- as.character(cncc$subtype_final[match(names(cncc_colors),cncc$RNA_snn_res.1)])
+DimPlot_scCustom(cncc, group.by="subtype_final",colors_use = cncc_colors,label=T,label.box=T,repel=T) +
+  scale_fill_manual(values = rep("white",length(unique(cncc$subtype_final)))) + NoLegend()
+```
+
+
+```{r}
+cncc_colors_subtypefinal_names <- cncc_colors
+cncc_colors_RNAres1_names <- cncc_colors
+names(cncc_colors_RNAres1_names) <- cncc$RNA_snn_res.1[match(names(cncc_colors_RNAres1_names),cncc$subtype_final)]
+cncc_colors_subtypestage_names <- cncc_colors_RNAres1_names
+names(cncc_colors_subtypestage_names) <- cncc$subtype_stage[match(names(cncc_colors_subtypestage_names),cncc$RNA_snn_res.1)]
+```
+
+```{r}
+DimPlot_scCustom(cncc,group.by="RNA_snn_res.1",colors_use = cncc_colors_RNAres1_names,label=T,label.box=T,repel=T) +
+  scale_fill_manual(values = rep("white",length(unique(cncc$RNA_snn_res.1)))) + NoLegend()
+
+DimPlot_scCustom(cncc,group.by="subtype_final",colors_use = cncc_colors_subtypefinal_names,label=T,label.box=T,repel=T) +
+  scale_fill_manual(values = rep("white",length(unique(cncc$subtype_final)))) + NoLegend()
+
+DimPlot_scCustom(cncc,group.by="subtype_stage",colors_use = cncc_colors_subtypestage_names,label=T,label.box=T,repel=T) +
+  scale_fill_manual(values = rep("white",length(unique(cncc$subtype_stage)))) + NoLegend()
+
+DimPlot_scCustom(cncc,group.by="stage",colors_use = stage_colors,label=F)
+```
+
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/CNCC_subtype_final_DimPlots.pdf",width=11,height=8.5)
+DimPlot_scCustom(cncc,group.by="RNA_snn_res.1",colors_use = cncc_colors_RNAres1_names,label=T,label.box=T,repel=T) +
+  scale_fill_manual(values = rep("white",length(unique(cncc$RNA_snn_res.1)))) + NoLegend()
+
+DimPlot_scCustom(cncc,group.by="subtype_final",colors_use = cncc_colors_subtypefinal_names,label=T,label.box=T,repel=T) +
+  scale_fill_manual(values = rep("white",length(unique(cncc$subtype_final)))) + NoLegend()
+
+DimPlot_scCustom(cncc,group.by="subtype_stage",colors_use = cncc_colors_subtypestage_names,label=T,label.box=T,repel=T) +
+  scale_fill_manual(values = rep("white",length(unique(cncc$subtype_stage)))) + NoLegend()
+
+DimPlot_scCustom(cncc,group.by="stage",colors_use = stage_colors,label=F)
+dev.off()
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/CNCC_SOX10_FeaturePlot.pdf",width=8,height=6)
+FeaturePlot(cncc,"SOX10",label=F)
+dev.off()
+```
+
+
+```{r}
+cncc$subtype_final <- cncc$subtype_final
+cncc$subtype_final_reduced <- strsplit2(as.character(cncc$subtype_final),split="\\.[0-9]$")[,1]
+cncc$subtype_final_reduced <- factor(cncc$subtype_final_reduced, levels= sort(unique(cncc$subtype_final_reduced)))
+
+p1 <- DimPlot(cncc,group.by="subtype_final_reduced",label=T)
+p2 <- DimPlot(cncc,group.by="subtype_final",label=T)
+p1
+p2
+```
+
+```{r}
+VlnPlot_scCustom(seurat_object = cncc, features = "Anterior_ModuleScore1", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final",colors_use = cncc_colors_subtypefinal_names) + NoLegend()
+
+VlnPlot_scCustom(seurat_object = cncc, features = "Central_ModuleScore1", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final",colors_use = cncc_colors_subtypefinal_names) + NoLegend()
+
+VlnPlot_scCustom(seurat_object = cncc, features = "Posterior_ModuleScore1", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final",colors_use = cncc_colors_subtypefinal_names) + NoLegend()
+
+Stacked_VlnPlot(cncc,features=c("Anterior_ModuleScore1","Central_ModuleScore1","Posterior_ModuleScore1"),pt.size = 0,group.by="subtype_final", colors_use = cncc_colors_subtypefinal_names,x_lab_rotate = 45)
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/CNCC_subtype_final_HoxModules_VlnPlot.pdf",width=11,height=8.5)
+VlnPlot_scCustom(seurat_object = cncc, features = "Anterior_ModuleScore1", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final",colors_use = cncc_colors_subtypefinal_names) + NoLegend()
+
+VlnPlot_scCustom(seurat_object = cncc, features = "Central_ModuleScore1", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final",colors_use = cncc_colors_subtypefinal_names) + NoLegend()
+
+VlnPlot_scCustom(seurat_object = cncc, features = "Posterior_ModuleScore1", 
+                 plot_median = TRUE, pt.size = 0,group.by="subtype_final",colors_use = cncc_colors_subtypefinal_names) + NoLegend()
+
+Stacked_VlnPlot(cncc,features=c("Anterior_ModuleScore1","Central_ModuleScore1","Posterior_ModuleScore1"),pt.size = 0,group.by="subtype_final", colors_use = cncc_colors_subtypefinal_names,x_lab_rotate = 45)
+dev.off()
+```
+
+Barplots by stage
+```{r}
+cncc$subtype_final <- factor(cncc$subtype_final, levels=names(sort(table(cncc$subtype_final),decreasing = T)))
+
+
+p1 <- SCpubr::do_BarPlot(cncc, 
+                   group.by = "stage",
+                   split.by = "subtype_final",
+                   position = "fill",
+                   flip = FALSE, 
+                   legend.position = "right",
+                   colors.use = stage_colors)
+p1
+
+p2 <- SCpubr::do_BarPlot(cncc, 
+                   group.by = "stage",
+                   split.by = "subtype_final",
+                   position = "stack",
+                   flip = FALSE, 
+                   legend.position = "right",
+                   colors.use = stage_colors)
+p2
+
+
+p3 <- SCpubr::do_BarPlot(cncc, 
+                   group.by = "subtype_final",
+                   split.by = "stage",
+                   position = "fill",
+                   flip = FALSE, 
+                   legend.position = "right",
+                   colors.use = cncc_colors_subtypefinal_names)
+p3
+
+p4 <- SCpubr::do_BarPlot(cncc, 
+                   group.by = "subtype_final",
+                   split.by = "stage",
+                   position = "stack",
+                   flip = FALSE, 
+                   legend.position = "right",
+                   colors.use = cncc_colors_subtypefinal_names)
+p4
+
+```
+
+```{r}
+cncc_label_only <- cncc[,grep("CNCC",cncc$subtype_final)]
+cncc_label_only$subtype_final <- factor(cncc_label_only$subtype_final,
+                                        levels=names(sort(table(cncc_label_only$subtype_final),decreasing = T)))
+
+```
+
+```{r}
+
+p5 <- SCpubr::do_BarPlot(cncc_label_only, 
+                   group.by = "stage",
+                   split.by = "subtype_final",
+                   position = "fill",
+                   flip = FALSE, 
+                   legend.position = "right",
+                   colors.use = stage_colors)
+p5
+
+p6 <- SCpubr::do_BarPlot(cncc_label_only, 
+                   group.by = "stage",
+                   split.by = "subtype_final",
+                   position = "stack",
+                   flip = FALSE, 
+                   legend.position = "right",
+                   colors.use = stage_colors)
+p6
+
+
+p7 <- SCpubr::do_BarPlot(cncc_label_only, 
+                   group.by = "subtype_final",
+                   split.by = "stage",
+                   position = "fill",
+                   flip = FALSE, 
+                   legend.position = "right",
+                   colors.use = cncc_colors_subtypefinal_names)
+p7
+
+p8 <- SCpubr::do_BarPlot(cncc_label_only, 
+                   group.by = "subtype_final",
+                   split.by = "stage",
+                   position = "stack",
+                   flip = FALSE, 
+                   legend.position = "right",
+                   colors.use = cncc_colors_subtypefinal_names)
+p8
+```
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/CNCC_subtype_final_stage_barplot.pdf",width=11,height=8.5)
+p1
+p2
+p3
+p4
+p5
+p6
+p7
+p8
+dev.off()
+```
+
+
+Find Markers for CNCC subtypes
+```{r}
+mart <-  useMart("ENSEMBL_MART_ENSEMBL") #, host = "https://useast.ensembl.org")
+mart <- useDataset("hsapiens_gene_ensembl", mart)
+
+annotLookup <- getBM(
+  mart = mart,
+  attributes = c(
+    "hgnc_symbol","description",
+    "entrezgene_id", "ensembl_gene_id",
+    "gene_biotype"),
+  filter = "hgnc_symbol",
+  values = rownames(cncc),
+  uniqueRows=TRUE)
+
+Idents(cncc) <- cncc$subtype_final
+cncc_marker_genes <- FindAllMarkers(cncc, assay = "RNA" ,logfc.threshold = 0.25, test.use = "wilcox", min.pct = 0.1, 
+                                   min.diff.pct = -Inf, node = NULL, verbose = TRUE,
+                                   only.pos = TRUE, max.cells.per.ident = Inf, random.seed = 1,
+                                   latent.vars = NULL, min.cells.feature = 3, min.cells.group = 3,
+                                   pseudocount.use = 1, return.thresh = 0.01)
+
+cncc_marker_genes <- mutate(cncc_marker_genes,pct.diff=pct.1-pct.2)
+id <- intersect(annotLookup$hgnc_symbol,cncc_marker_genes$gene)
+x <- cncc_marker_genes[cncc_marker_genes$gene %in% id,]
+cncc_marker_genes$Entrez <- annotLookup$entrezgene_id[match(as.character(cncc_marker_genes$gene),annotLookup$hgnc_symbol)]
+cncc_marker_genes$description <- annotLookup$description[match(as.character(cncc_marker_genes$gene),annotLookup$hgnc_symbol)]
+cncc_marker_genes$biotype <- annotLookup$gene_biotype[match(as.character(cncc_marker_genes$gene),annotLookup$hgnc_symbol)]
+
+cncc_marker_genes <- cncc_marker_genes[, c("gene","Entrez","description","biotype","p_val_adj","avg_log2FC","pct.1","pct.2","pct.diff","cluster")]
+head(cncc_marker_genes)
+
+# openxlsx::write.xlsx(cncc_marker_genes,"Craniofacial-scRNAseqManuscript/final-tables/SigGenes_cncc_Subtypes_27Mar.xlsx")
+```
+
+
+```{r}
+tf_table <- read.table("human_tf_Lambertetal_PMID29425488.txt",sep="\t",header = T)
+tf_table$gene.name <- annotLookup$hgnc_symbol[match(tf_table$Human_TF,annotLookup$ensembl_gene_id)]
+```
+
+Identify top DEGs
+```{r}
+sig_genes_cncc_subtypes <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/SigGenes_cncc_Subtypes_27Mar.xlsx")
+sig_genes_cncc_subtypes$ensemblID <- annotLookup$ensembl_gene_id[match(sig_genes_cncc_subtypes$Entrez,annotLookup$entrezgene_id)]
+
+sig_genes_cncc_subtypes$TF <- "No"
+sig_genes_cncc_subtypes$TF[which(sig_genes_cncc_subtypes$ensemblID%in%tf_table$Human_TF)] <- "Yes"
+
+sig_genes_cncc_subtypes_protein <- sig_genes_cncc_subtypes %>% filter(biotype == "protein_coding",TF=="Yes")
+
+cncc$subtype_final <- factor(cncc$subtype_final)
+
+top_celtype <- sig_genes_cncc_subtypes_protein %>% 
+  mutate(cluster = factor(cluster, levels = levels(cncc$subtype_final))) %>% 
+  group_by(cluster) %>% top_n(5, avg_log2FC) %>% arrange(cluster)
+
+top100_celltype <- sig_genes_cncc_subtypes_protein %>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% top_n(100, avg_log2FC)
+top100pval_celltype <- subset(top100_celltype, rowSums(top100_celltype[5] < 0.05) > 0)
+
+top50_celltype <- sig_genes_cncc_subtypes_protein%>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% top_n(50, avg_log2FC)
+top50pval_celltype <- subset(top50_celltype, rowSums(top50_celltype[5] < 0.05) > 0)
+```
+
+DotPlot of top DEGs
+```{r}
+sig_genes_cncc_subtypes_protein <- sig_genes_cncc_subtypes_protein[order(sig_genes_cncc_subtypes_protein$cluster),]
+
+top_initial_cncc_subtype <- sig_genes_cncc_subtypes_protein %>% group_by(cluster) %>% top_n(5, avg_log2FC)
+
+Idents(cncc) <- factor(cncc$subtype_final,levels=sort(as.character(unique(cncc$subtype_final))))
+  p <- DotPlot(object = cncc, features = unique(top_initial_cncc_subtype$gene))+ coord_flip()+ RotatedAxis()
+df <- data.frame(Gene = p$data$features.plot, avg.exp = p$data$avg.exp.scaled, pct.exp = p$data$pct.exp, cluster = p$data$id)
+
+out <- DotPlot_scCustom(seurat_object = cncc, features = unique(top_initial_cncc_subtype$gene), colors_use = viridis_plasma_dark_high,flip_axes=T,
+                         remove_axis_titles = T,x_lab_rotate = T) + theme(axis.text.x = element_text(size = 10),axis.text.y = element_text(size = 6, face = "italic")) 
+
+out
+
+Idents(cncc_label_only) <- factor(cncc_label_only$subtype_final,levels=sort(as.character(unique(cncc_label_only$subtype_final))))
+out2 <- DotPlot_scCustom(seurat_object = cncc_label_only, 
+                         features = unique(top_initial_cncc_subtype$gene[grep("CNCC",top_initial_cncc_subtype$cluster)]),
+                         colors_use = viridis_plasma_dark_high,flip_axes=T,
+                         remove_axis_titles = T,x_lab_rotate = T) + 
+  theme(axis.text.x = element_text(size = 10),axis.text.y = element_text(size = 6, face = "italic"), legend.position = "bottom",legend.justification = "center", legend.title = element_text(size = 10, hjust=0.5),legend.text = element_text(size = 10))+guides(color = guide_colorbar(title.position = "top",title = "Average Expression"),size = guide_legend(title.position = "top",title = "Percent Expressed")) 
+
+out2
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/CNCC_subtype_final_TF_markergenes_dotplot.pdf",width=10,height=11)
+out
+out2
+dev.off()
+
+```
+
+Clustered DotPlot ofr cncc marker genes
+```{r}
+cncc_markers <- c("CDH19","PTPRZ1","EDNRB","ERBB3","ETS1","INSC","FOXD3","CDH6","MOXD1","ADGRG6","TFAP2A","TFAP2B","BCHE","SOX10","SOX9","MPZ","PLP1","KCNH8","KANK4","MMP17","SPP1","EGFLAM","PAX3","GAS7","NR2F1","NR2F2","COL20A1","COL1A1")
+
+Idents(cncc) <- cncc$subtype_final
+dot <- Clustered_DotPlot(cncc, features = cncc_markers,colors_use_idents = cncc_colors_subtypefinal_names,
+                         plot_km_elbow = FALSE,legend_position = "right")
+dot
+
+cncc_label_only$subtype_final <- factor(cncc_label_only$subtype_final,levels=unique(as.character(cncc_label_only$subtype_final)))
+Idents(cncc_label_only) <- cncc_label_only$subtype_final
+dot1 <- Clustered_DotPlot(cncc_label_only, features = cncc_markers,colors_use_idents = cncc_colors_subtypefinal_names[match(levels(cncc_label_only$subtype_final),names(cncc_colors_subtypefinal_names))],
+                         plot_km_elbow = FALSE,legend_position = "right")
+dot1
+```
+
+
+```{r}
+
+p <- VlnPlot(cncc,features=cncc_markers,pt.size=0,group.by="subtype_final",stack = T,combine = T,flip = T) + NoLegend()
+p
+
+p1 <- VlnPlot(cncc_label_only,features=cncc_markers,pt.size=0,group.by="subtype_final",stack = T,combine = T,flip = T) + NoLegend()
+p1
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/CNCC_subtype_final_markergenes_VlnPlot_DotPlot.pdf",width=8,height=11)
+dot
+dot1
+p
+p1
+dev.off()
+
+```
+
+Heatmap of cncc marker genes
+```{r}
+cncc.markers <- c("CDH19","PTPRZ1","EDNRB","ERBB3","ETS1","INSC","FOXD3","CDH6","MOXD1","ADGRG6","TFAP2A","TFAP2B","BCHE","SOX10","SOX9","MPZ","PLP1","KCNH8","KANK4","MMP17","SPP1","EGFLAM","PAX3","GAS7","NR2F1","NR2F2","COL20A1","COL1A1")
+cncc.markers.scale <- ScaleData(cncc, features = cncc.markers)
+
+DoHeatmap(cncc.markers.scale,features=cncc.markers,group.colors = cncc_plot_colors,label = F)
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/CNCC_subtype_final_markergenes_Heatmap.pdf",width=8,height=8)
+DoHeatmap(cncc.markers.scale,features=cncc.markers,group.colors = cncc_plot_colors,label = F)
+dev.off()
+```
+
+
+Functional Annotation
+```{r}
+top_cncc <- sig_genes_cncc_subtypes %>% 
+  mutate(cluster = factor(cluster, levels = levels(cncc$subtype_final))) %>% 
+  group_by(cluster) %>% top_n(5, avg_log2FC) %>% arrange(cluster)
+
+top100_cncc <- sig_genes_cncc_subtypes %>% filter(p_val_adj < 0.05)  %>% group_by(cluster) %>% top_n(100, avg_log2FC)
+top100pval_cncc <- subset(top100_cncc, rowSums(top100_cncc[5] < 0.05) > 0)
+
+top50_cncc <- sig_genes_cncc_subtypes %>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% top_n(50, avg_log2FC)
+top50pval_cncc <- subset(top50_cncc, rowSums(top50_cncc[5] < 0.05) > 0)
+
+df1 <- top100pval_cncc[,c(2,10)]
+df1$cluster <- factor(df1$cluster,levels=levels(cncc$subtype_final))
+df1sample <- split(df1$Entrez,df1$cluster)
+length(df1sample)
+initial_types <- names(df1sample)
+
+genelist <- as.list(df1sample)
+background_genes <- unique(sig_genes_cncc_subtypes$Entrez)
+
+BPclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'BP', universe = background_genes)
+BPclusterplot <- pairwise_termsim(BPclusterplot)
+
+CCclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'CC', universe = background_genes)
+CCclusterplot <- pairwise_termsim(CCclusterplot)
+
+MFclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'MF', universe = background_genes)
+MFclusterplot <- pairwise_termsim(MFclusterplot)
+
+Pathwayclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichPathway", pvalueCutoff=0.05, pAdjustMethod = "BH", universe = background_genes)
+Pathwayclusterplot <- pairwise_termsim(Pathwayclusterplot)
+
+KEGGclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichKEGG", pvalueCutoff=0.05, pAdjustMethod = "BH", universe = background_genes)
+KEGGclusterplot <- pairwise_termsim(KEGGclusterplot)
+
+DOclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichDGN", pvalueCutoff=0.05, pAdjustMethod = "BH", universe = background_genes)
+DOclusterplot <- pairwise_termsim(DOclusterplot)
+
+
+options(enrichplot.colours = c("blue", "grey"))
+p1 <- dotplot(BPclusterplot, showCategory = 5, font.size = 6, title = "GO: Biological Process", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1))
+options(enrichplot.colours = c("orange", "grey"))
+p2 <- dotplot(CCclusterplot, showCategory = 5, font.size = 6, title = "GO: Cellular Component", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1))
+options(enrichplot.colours = c("green", "grey"))
+p3 <- dotplot(MFclusterplot, showCategory = 5, font.size = 6, title = "GO: Molecular Function", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1))
+options(enrichplot.colours = c("brown", "grey"))
+p4 <- dotplot(Pathwayclusterplot, showCategory = 5, font.size = 6, title = "Reactome Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1))
+options(enrichplot.colours = c("yellow", "grey"))
+p5 <- dotplot(KEGGclusterplot, showCategory = 5, font.size = 6, title = "KEGG Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1))
+options(enrichplot.colours = c("red", "grey"))
+p6 <- dotplot(DOclusterplot, showCategory = 5, font.size = 6, title = "DisGeNet", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1))
+
+p1
+p2
+p3
+p4
+p5
+p6
+
+```
+
+```{r}
+human_cncc_annot_list <- list(BP =BPclusterplot, CC=CCclusterplot, MF = MFclusterplot, Reactome=Pathwayclusterplot,
+                          KEGG=KEGGclusterplot, DisGeNet=DOclusterplot)
+saveRDS(human_cncc_annot_list, "human_face_cncc_subtype_final_functional-annotation_lists_27Mar.rds")
+
+
+human_cncc_annot_list <- readRDS("human_face_cncc_subtype_final_functional-annotation_lists_27Mar.rds")
+human_cncc_annot_list$BP <- human_cncc_annot_list$BP@compareClusterResult
+human_cncc_annot_list$CC <- human_cncc_annot_list$CC@compareClusterResult
+human_cncc_annot_list$MF <- human_cncc_annot_list$MF@compareClusterResult
+human_cncc_annot_list$Reactome <- human_cncc_annot_list$Reactome@compareClusterResult
+human_cncc_annot_list$KEGG <- human_cncc_annot_list$KEGG@compareClusterResult
+human_cncc_annot_list$DisGeNet <- human_cncc_annot_list$DisGeNet@compareClusterResult
+openxlsx::write.xlsx(human_cncc_annot_list, file = "Craniofacial-scRNAseqManuscript/final-tables/human_face_cncc_subtype_final_functional-annotation.xlsx",
+                     sheetName = names(human_cncc_annot_list), rowNames = FALSE)
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/CNCC_subtype_final_Top5_FunctionalEnrichment_dotplot.pdf",width=13,height=16)
+p1
+p2
+p3
+p4
+p5
+p6
+dev.off()
+```
+
+```{r}
+pdf(file = "Craniofacial-scRNAseqManuscript/final-figs/CNCC_subtype_final_Top5_FunctionalEnrichment_dotplot_plotgrid.pdf", w = 17, h = 22)
+cowplot::plot_grid(p1, p2, p3, p4, p5, p6, ncol=2, labels=LETTERS[1:6])
+dev.off()
+```
+
+CNCC module score
+```{r}
+#CNCC marker list from Feng et al. 2021 (doi.org/10.1038/s42003-021-01970-0)  https://www.nature.com/articles/s42003-021-01970-0
+cnccMarkers <- str_to_upper(c("sox10","Ets1", "Foxd3", "Tfap2a", "Tfap2b", "NR2F1", "NR2F2", "Tcf3", "Tcf12"))
+
+cncc <- AddModuleScore(cncc,list(cnccMarkers),name="CNCC_ModuleScore")
+
+CNCC_modscore_median <- median(cncc$CNCC_ModuleScore1)
+
+# CNCC_data <- as.numeric(initial.filt_singlet_noneuro$CNCC_ModuleScore1[which(initial.filt_singlet_noneuro$celltype=="SOX2-_SOX10+")])
+# 
+# results <- c()
+# for (celltype in setdiff(unique(initial.filt_singlet_noneuro$celltype),"SOX2-_SOX10+")) {
+#   # Subset the data for the current time point
+#   celltype_data <- as.numeric(initial.filt_singlet_noneuro$CNCC_ModuleScore1[which(initial.filt_singlet_noneuro$celltype==celltype)])
+#   
+#   # Perform the Wilcoxon Signed-Rank Test
+#   test_result <- wilcox.test(x=CNCC_data, y = celltype_data, alternative="greater")
+#   
+#   # Store the results
+#   results <- rbind(results, data.frame(celltype = celltype, 
+#                                        W_stat = test_result$statistic, 
+#                                        p_value = test_result$p.value))
+# }
+# 
+# 
+# results$padj <- p.adjust(results$p_value, method = "BH")
+# print(results)
+# 
+# cncc_vs_all <- wilcox.test(x=CNCC_data, y = as.numeric(initial.filt_singlet_noneuro$CNCC_ModuleScore1[which(initial.filt_singlet_noneuro$celltype!="SOX2-_SOX10+")]), alternative="greater")
+#   
+# print(cncc_vs_all)
+
+ VlnPlot_scCustom(cncc,"CNCC_ModuleScore1", plot_median = T,group.by="subtype_final",pt.size = 0,
+                  colors_use = cncc_colors_subtypefinal_names) + 
+   NoLegend() + ylab("CNCC Module Score") #+ ylim(c(-0.55,2)) + 
+#    geom_text(
+#   aes(x = "SOX2-_SOX10+", y = max(initial.filt_singlet_noneuro$CNCC_ModuleScore1) + 0.1),
+#   label = "* * *",angle=90,
+#   size = 6,  # Adjust size of the asterisk
+#   color = "black"  # Optional: Customize color
+# ) + coord_flip()
+# 
+
+```
+```{r}
+ VlnPlot_scCustom(cncc,"CNCC_ModuleScore1", plot_median = T,group.by="subtype_final",pt.size = 0,
+                  colors_use = cncc_colors_subtypefinal_names) + 
+   NoLegend() + ylab("CNCC Module Score") + geom_hline(yintercept = median(cncc$CNCC_ModuleScore1),linetype=2)
+```
+
+
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/CNCC_subtypes_CNCCModuleScore_VlnPlot.pdf",width=10,height=6)
+ VlnPlot_scCustom(cncc,"CNCC_ModuleScore1", plot_median = T,group.by="subtype_final",pt.size = 0,
+                  colors_use = cncc_colors_subtypefinal_names) + 
+   NoLegend() + ylab("CNCC Module Score") + geom_hline(yintercept = median(cncc$CNCC_ModuleScore1),linetype=2)
+dev.off()
+```
+
+
+Optimal number of clusters for mouse CNCCs
+```{r}
+set.seed(123)
+x=mcncc1@assays$RNA$scale.data
+diss <- Rfast::Dist(as.matrix(x))
+# diss <- diss[lower.tri(diss)]
+
+k.max=50
+v <- rep(0, k.max)
+for (i in 1:k.max) {
+  clust <- kmeans(x, i)
+  v[i] <- factoextra:::.get_withinSS(diss, clust$cluster)
+  cat(i)
+}
+
+
+df <- data.frame(clusters = as.factor(1:k.max), y = v, 
+                 stringsAsFactors = TRUE)
+```
+
+```{r}
+ylab <- "Total Within Sum of Square"
+p <- ggpubr::ggline(df, x = "clusters", y = "y", group = 1, 
+                    color = "steelblue", ylab = ylab, xlab = "Number of clusters k", 
+                    main = "Mouse CNCC: Optimal number of clusters")
+
+saveRDS(p,"human_face_mcncc1_ElbowPlot_data_27Mar.rds")
+p <- readRDS("human_face_mcncc1_ElbowPlot_data_27Mar.rds")
+p + scale_x_discrete(breaks = seq(0, max(as.numeric(as.character(p$data$clusters))), by = 5))+
+  geom_vline(xintercept = elbow_point(as.numeric(p$data$clusters),as.numeric(p$data$y))$x, linetype=2)
+
+elbow_point(as.numeric(p$data$clusters),as.numeric(p$data$y))
+# x= 11 clusters
+
+apply(mcncc1@meta.data[,grep("RNA_snn_res",colnames(mcncc1@meta.data))],2,function(x) length(unique(x)))
+# choosing resolution=0.8 (10 clusters)
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_CNCC_Subclustering_OptimalClusters_ElbowPlot.pdf",width=11,height=8.5)
+p + scale_x_discrete(breaks = seq(0, max(as.numeric(as.character(p$data$clusters))), by = 5))+
+  geom_vline(xintercept = elbow_point(as.numeric(p$data$clusters),as.numeric(p$data$y))$x, linetype=2)
+dev.off()
+```
+
+
+Trying to transfer Human CNCC Subtypes to mouse CNCC clusters
+```{r}
+mcncc <- readRDS("mcncc_final.rds")
+
+annotLookup_ortho_one2one <- orthogene::convert_orthologs(rownames(mcncc),input_species="mouse",output_species = "human",
+                                                          non121_strategy = "drop_both_species", method="gprofiler") 
+
+mcncc1 <- mcncc[which(rownames(mcncc)%in%annotLookup_ortho_one2one$input_gene),]
+rownames(mcncc1) <- rownames(annotLookup_ortho_one2one)[match(rownames(mcncc1),annotLookup_ortho_one2one$input_gene)]
+
+Idents(cncc) <- factor(cncc$subtype_final)
+Idents(mcncc1) <- mcncc1$tempanno
+anchors <- FindTransferAnchors(reference = cncc, query = mcncc1, reduction = 'rpca', normalization.method = "LogNormalize", dims = 1:30,features = rownames(cncc))
+
+# saveRDS(anchors,"human_face_cncc_allHtoM_anchors_rpca_cellrangerARC-raw_emptyDrops_singlets_27Mar.rds")
+
+# anchors <- readRDS("human_face_cncc_allHtoM_anchors_rpca_cellrangerARC-raw_emptyDrops_singlets_27Mar.rds")
+predicted.id <- TransferData(anchorset = anchors, refdata = Idents(cncc), weight.reduction = mcncc1[['harmony']],dims = 1:30)
+mcncc1$human_predicted_rpca <- predicted.id$predicted.id
+```
+
+```{r}
+confusionMat_mcncc1 <- as.data.frame(table(mcncc1$human_predicted_rpca,mcncc1$RNA_snn_res.1))
+confusionMat_mcncc1 <- dcast(confusionMat_mcncc1, Var1 ~ Var2, value.var = "Freq")
+rownames(confusionMat_mcncc1) <- confusionMat_mcncc1[,1]
+confusionMat_mcncc1 <- confusionMat_mcncc1[,-1]
+
+pheatmap(t(confusionMat_mcncc1), scale="row")
+cnccsubtype_table<-as.data.frame(apply(confusionMat_mcncc1,2,function(x) rownames(confusionMat_mcncc1)[which.max(x)]))
+cnccsubtype_table[,1] <- make.names(cnccsubtype_table[,1],unique = T)
+mcncc1$subtype_rpca <- cnccsubtype_table[match(mcncc1$RNA_snn_res.1,rownames(cnccsubtype_table)),1]
+mcncc1$subtype_rpca <- gsub("\\.\\.","\\.",mcncc1$subtype_rpca)
+
+DimPlot(mcncc1,group.by="RNA_snn_res.1",label=T) + NoLegend()
+DimPlot(mcncc1,group.by="human_predicted_rpca",label=T) 
+DimPlot(mcncc1,group.by="subtype_rpca",label=T) + NoLegend()
+```
+```{r}
+confusionMat_mcncc1_subtype <- confusionMat_mcncc1
+colnames(confusionMat_mcncc1_subtype) <- mcncc1$subtype_rpca[match(colnames(confusionMat_mcncc1_subtype),mcncc1$RNA_snn_res.1)]
+
+pheatmap(t(confusionMat_mcncc1_subtype), scale="row")
+DimPlot(mcncc1,group.by="subtype_rpca",label=T) + NoLegend()
+
+
+
+```
+
+Downsample mouse cncc for bar plot
+```{r}
+Idents(mcncc1) <- mcncc1$stage
+mcncc1_downsample <- subset(mcncc1,downsample=200)
+
+SCpubr::do_BarPlot(mcncc1_downsample, 
+                   group.by = "stage",
+                   split.by = "subtype1",
+                   position = "fill",
+                   flip = FALSE,
+                   add.n = TRUE,
+                   legend.position = "right")
+
+
+SCpubr::do_BarPlot(mcncc1_downsample, 
+                   group.by = "stage",
+                   split.by = "tempanno",
+                   position = "fill",
+                   flip = FALSE,
+                   add.n = TRUE,
+                   legend.position = "right")
+```
+
+plot prediction scores from label transfer
+```{r}
+
+colnames(predicted.id) <- gsub("\\.\\.","\\.",colnames(predicted.id))
+
+mcncc1$predicted.score_rpca <- rep(0,ncol(mcncc1))
+identical(rownames(predicted.id),colnames(mcncc1))
+for (cell in 1:nrow(predicted.id)){
+  if (as.character(mcncc1$subtype1[cell]) %in% gsub("prediction.score.","",colnames(predicted.id))){
+    mcncc1$predicted.score_rpca[cell] <- predicted.id[cell,match(as.character(mcncc1$subtype1[cell]),
+                                                       gsub("prediction.score.","",colnames(predicted.id)))]
+  } else{
+    mcncc1$predicted.score_rpca[cell] <- predicted.id[cell,match(as.character(strsplit2(mcncc1$subtype1[cell],split="\\.[0-9]$")[,1]),
+                                                         gsub("prediction.score.","",colnames(predicted.id)))]
+  }
+}
+
+mcncc1$subtype1 <- factor(mcncc1$subtype1)
+p <- SCpubr::do_BoxPlot(sample = mcncc1,
+                        feature = "predicted.score_rpca",
+                        group.by = "subtype1",
+                        legend.position = "right",
+                        plot.title="RPCA prediction scores")
+p + NoLegend()
+```
+
+```{r}
+Idents(cncc) <- factor(cncc$subtype_final)
+Idents(mcncc1) <- mcncc1$tempanno
+anchors_cca <- FindTransferAnchors(reference = cncc, query = mcncc1, reduction = 'cca', normalization.method = "LogNormalize", dims = 1:30,features = rownames(cncc))
+
+# saveRDS(anchors_cca,"human_face_cncc_allHtoM_anchors_cca_cellrangerARC-raw_emptyDrops_singlets_27Mar.rds")
+
+anchors_cca <- readRDS("human_face_cncc_allHtoM_anchors_cca_cellrangerARC-raw_emptyDrops_singlets_27Mar.rds")
+predicted.id <- TransferData(anchorset = anchors_cca, refdata = Idents(cncc), weight.reduction = mcncc1[['harmony']],dims = 1:30)
+mcncc1$human_predicted_cca <- predicted.id$predicted.id
+```
+
+Plot transferred subtype labels
+```{r}
+confusionMat_mcncc1 <- as.data.frame(table(mcncc1$human_predicted_cca,mcncc1$RNA_snn_res.1))
+confusionMat_mcncc1 <- dcast(confusionMat_mcncc1, Var1 ~ Var2, value.var = "Freq")
+rownames(confusionMat_mcncc1) <- confusionMat_mcncc1[,1]
+confusionMat_mcncc1 <- confusionMat_mcncc1[,-1]
+
+pheatmap(t(confusionMat_mcncc1), scale="row")
+cnccsubtype_table<-as.data.frame(apply(confusionMat_mcncc1,2,function(x) rownames(confusionMat_mcncc1)[which.max(x)]))
+cnccsubtype_table[,1] <- make.names(cnccsubtype_table[,1],unique = T)
+mcncc1$subtype_cca <- cnccsubtype_table[match(mcncc1$RNA_snn_res.1,rownames(cnccsubtype_table)),1]
+mcncc1$subtype_cca <- gsub("\\.\\.","\\.",mcncc1$subtype_cca)
+
+DimPlot(mcncc1,group.by="RNA_snn_res.1",label=T) + NoLegend()
+DimPlot(mcncc1,group.by="human_predicted_cca",label=T) 
+DimPlot(mcncc1,group.by="subtype_cca",label=T) + NoLegend()
+```
+
+```{r}
+confusionMat_mcncc1_subtype <- confusionMat_mcncc1
+colnames(confusionMat_mcncc1_subtype) <- mcncc1$subtype_cca[match(colnames(confusionMat_mcncc1_subtype),mcncc1$RNA_snn_res.1)]
+
+pheatmap(t(confusionMat_mcncc1_subtype), scale="row")
+DimPlot(mcncc1,group.by="subtype_cca",label=T) + NoLegend()
+
+
+```
+
+```{r}
+Idents(mcncc1) <- mcncc1$stage
+mcncc1_downsample <- subset(mcncc1,downsample=200)
+
+SCpubr::do_BarPlot(mcncc1_downsample, 
+                   group.by = "stage",
+                   split.by = "subtype_cca",
+                   position = "fill",
+                   flip = FALSE,
+                   add.n = TRUE,
+                   legend.position = "right")
+
+
+SCpubr::do_BarPlot(mcncc1_downsample, 
+                   group.by = "stage",
+                   split.by = "tempanno",
+                   position = "fill",
+                   flip = FALSE,
+                   add.n = TRUE,
+                   legend.position = "right")
+```
+
+```{r}
+
+colnames(predicted.id) <- gsub("\\.\\.","\\.",colnames(predicted.id))
+
+mcncc1$predicted.score_cca <- rep(0,ncol(mcncc1))
+identical(rownames(predicted.id),colnames(mcncc1))
+for (cell in 1:nrow(predicted.id)){
+  if (as.character(mcncc1$subtype_cca[cell]) %in% gsub("prediction.score.","",colnames(predicted.id))){
+    mcncc1$predicted.score_cca[cell] <- predicted.id[cell,match(as.character(mcncc1$subtype_cca[cell]),
+                                                       gsub("prediction.score.","",colnames(predicted.id)))]
+  } else{
+    mcncc1$predicted.score_cca[cell] <- predicted.id[cell,match(as.character(strsplit2(mcncc1$subtype_cca[cell],split="\\.[0-9]$")[,1]),
+                                                         gsub("prediction.score.","",colnames(predicted.id)))]
+  }
+}
+
+mcncc1$subtype1 <- factor(mcncc1$subtype_cca)
+p <- SCpubr::do_BoxPlot(sample = mcncc1,
+                        feature = "predicted.score_cca",
+                        group.by = "subtype_cca",
+                        legend.position = "right",
+                        plot.title="CCA prediction scores")
+p + NoLegend()
+```
+
+
+```{r}
+DimPlot(mcncc1,group.by="RNA_snn_res.1",label=T) + NoLegend()
+```
+
+
+SAMap for further correcting CNCC subtype annotations
+
+```{r}
+MappingTable <- read.table("/scr1/users/manchela/Data/Multiome/Humanface/GEX/SAMap/SAMapOutput_MappingTable_human-mouse_cncc_27Mar.txt", sep = '\t',header = 1,row.names = 1)
+MappingTable <-as.matrix(MappingTable[grep("mo",rownames(MappingTable)),grep("hu",colnames(MappingTable))])
+
+human.celltype.match <- data.frame(x=colnames(MappingTable),y=strsplit2(colnames(MappingTable),split="_")[,2])
+mouse.celltype.match <- data.frame(x=rownames(MappingTable),y=strsplit2(rownames(MappingTable),split="_")[,2])
+
+rownames(MappingTable) <- mouse.celltype.match$y[match(rownames(MappingTable),mouse.celltype.match$x)]
+colnames(MappingTable) <- human.celltype.match$y[match(colnames(MappingTable),human.celltype.match$x)]
+
+p1 <- pheatmap(MappingTable,scale="row",angle_col=45, main="SAMap - CNCC Mouse vs. Human")
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))  # Reduce plot size to create margins
+p1
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human Res 0.8 Clusters", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+cncc_annot_table <- as.data.frame(cbind(as.numeric(cncc$RNA_snn_res.1)-1,as.character(cncc$subtype_final)))
+cncc_annot_table <- cncc_annot_table[-which(duplicated(cncc_annot_table)),]
+
+colnames(MappingTable) <- cncc_annot_table$V2[match(colnames(MappingTable),cncc_annot_table$V1)]
+
+SAMap_table <- apply(MappingTable,1,function(x) colnames(MappingTable)[which.max(x)])
+
+mcncc1$subtype_SAMap <- as.character(SAMap_table[match(mcncc1$RNA_snn_res.1,names(SAMap_table))])
+
+rownames(MappingTable) <- mcncc1$subtype_SAMap[match(rownames(MappingTable),mcncc1$RNA_snn_res.1)]
+
+p2 <- pheatmap(MappingTable,scale="row",angle_col=45, main="SAMap - CNCC Mouse vs. Human")
+
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))  # Reduce plot size to create margins
+p2
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human Subtypes", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+
+
+DimPlot(mcncc1,group.by="subtype_SAMap",label=T) + NoLegend()
+```
+
+```{r}
+as.data.frame(table(mcncc1$RNA_snn_res.1,mcncc1$subtype_rpca,mcncc1$subtype_cca,mcncc1$subtype_SAMap)) %>% filter(Freq!=0)
+
+#cluster 0: mesenchymal.CNCC
+#cluster 1: schwann.5
+#cluster 2: schwann.4
+#cluster 3: early.CNCC.1
+#cluster 4: schwann.3
+#cluster 5: int.CNCC.2
+#cluster 6: schwann.2
+#cluster 7: schwann.3
+#cluster 8: ncl2
+#cluster 9: schwann.1
+#cluster 10: sensory.CNCC
+#cluster 11: melanocytes
+  
+```
+
+
+```{r}
+#cluster 0: mesenchymal.CNCC
+#cluster 1: schwann.5
+#cluster 2: schwann.4
+#cluster 3: early.CNCC.1
+#cluster 4: schwann.3
+#cluster 5: int.CNCC.2
+#cluster 6: schwann.2
+#cluster 7: schwann.3
+#cluster 8: ncl2
+#cluster 9: schwann.1
+#cluster 10: sensory.CNCC
+#cluster 11: melanocytes
+
+mcncc1$subtype_final <- NA
+mcncc1$subtype_final[which(mcncc1$RNA_snn_res.1==0)] <- "mesenchymal.CNCC"
+mcncc1$subtype_final[which(mcncc1$RNA_snn_res.1==1)] <- "schwann.5"
+mcncc1$subtype_final[which(mcncc1$RNA_snn_res.1==2)] <- "schwann.4"
+mcncc1$subtype_final[which(mcncc1$RNA_snn_res.1==3)] <- "early.CNCC.1"
+mcncc1$subtype_final[which(mcncc1$RNA_snn_res.1==4)] <- "schwann.3.1"
+mcncc1$subtype_final[which(mcncc1$RNA_snn_res.1==5)] <- "int.CNCC.2"
+mcncc1$subtype_final[which(mcncc1$RNA_snn_res.1==6)] <- "schwann.2"
+mcncc1$subtype_final[which(mcncc1$RNA_snn_res.1==7)] <- "schwann.3.2"
+mcncc1$subtype_final[which(mcncc1$RNA_snn_res.1==8)] <- "ncl2"
+mcncc1$subtype_final[which(mcncc1$RNA_snn_res.1==9)] <- "schwann.1"
+mcncc1$subtype_final[which(mcncc1$RNA_snn_res.1==10)] <- "sensory.CNCC"
+mcncc1$subtype_final[which(mcncc1$RNA_snn_res.1==11)] <- "melanocytes"
+
+SCpubr::do_DimPlot(mcncc1, group.by="subtype_final",plot.axes = T,legend.position = "right",,label=T,repel=T)
+
+```
+
+```{r}
+# saveRDS(mcncc1,"human_face_mcncc1_cellrangerARC-raw_emptyDrops_singlets_27Mar.rds")
+mcncc1 <- readRDS("human_face_mcncc1_cellrangerARC-raw_emptyDrops_singlets_27Mar.rds")
+```
+
+
+```{r}
+Idents(mcncc1) <- mcncc1$subtype_final
+mcncc1_marker_genes <- FindAllMarkers(mcncc1, assay = "RNA" ,logfc.threshold = 0.25, test.use = "wilcox", min.pct = 0.1, 
+                                   min.diff.pct = -Inf, node = NULL, verbose = TRUE,
+                                   only.pos = TRUE, max.cells.per.ident = Inf, random.seed = 1,
+                                   latent.vars = NULL, min.cells.feature = 3, min.cells.group = 3,
+                                   pseudocount.use = 1, return.thresh = 0.01)
+
+mcncc1_marker_genes <- mutate(mcncc1_marker_genes,pct.diff=pct.1-pct.2)
+# openxlsx::write.xlsx(mcncc1_marker_genes,"Mouse_CNCC_SigGenes_subtype_final.xlsx")
+```
+
+plotting cell cycle scores, schwann module score, and sensory module score
+```{r}
+VlnPlot_scCustom(mcncc1,"S.Score", plot_median = T, pt.size=0,group.by="subtype_final") + NoLegend() +
+  geom_hline(yintercept=median(mcncc1$G2M.Score))
+
+VlnPlot_scCustom(mcncc1,"G2M.Score", plot_median = T, pt.size=0,group.by="subtype_final") + NoLegend() +
+  geom_hline(yintercept=median(mcncc1$G2M.Score))
+
+mcncc1 <- AddModuleScore(mcncc1, list(unique(schwann_cell_markers$gene_short_name)), name = "Schwann_ModuleScore")
+
+VlnPlot_scCustom(mcncc1,"Schwann_ModuleScore1", plot_median = T, pt.size=0,group.by="subtype_final") + NoLegend() +
+  geom_hline(yintercept=median(mcncc1$Schwann_ModuleScore1))
+
+mcncc1 <- AddModuleScore(mcncc1,list(soldatov_markers$hs_gene[which(soldatov_markers$Celltype=="sensory")]),name="Sensory_ModuleScore")
+
+VlnPlot_scCustom(mcncc1,"Sensory_ModuleScore1", plot_median = T, pt.size=0,group.by="subtype_final") + NoLegend() +
+  geom_hline(yintercept=median(mcncc1$Sensory_ModuleScore1))
+
+Stacked_VlnPlot(mcncc1,features=c("HOXA2","HOXA3","HOXB2","HOXB3","HOXD3"), pt.size=0,group.by="subtype_final") + NoLegend()
+```
+
+
+
+Finding marker genes for human and mouse subtypes for GeneOverlap
+
+```{r}
+# First find marker genes for each cluster
+
+cncc_marker_genes <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/SigGenes_cncc_Subtypes_27Mar.xlsx")
+
+# match with mouse one-to-one orthologs
+cncc_marker_genes_mouseOverlap <- cncc_marker_genes[which(cncc_marker_genes$gene%in%rownames(mcncc1)),]
+
+
+# get marker genes for each human cncc cluster
+top100_human_cncc_marker_genes <- cncc_marker_genes_mouseOverlap %>% filter(p_val_adj<0.05)%>%  group_by(cluster) %>% top_n(100, avg_log2FC) %>% split(.$cluster) %>% lapply(function(df) df$gene)
+
+
+# find marker genes for each mouse cncc subtype
+Idents(mcncc1) <- mcncc1$RNA_snn_res.1
+mouse_cncc_marker_genes <- FindAllMarkers(mcncc1, assay = "RNA" ,logfc.threshold = 0.25, test.use = "wilcox", min.pct = 0.1, 
+                                         min.diff.pct = -Inf, node = NULL, verbose = TRUE,
+                                         only.pos = TRUE, max.cells.per.ident = Inf, random.seed = 1,
+                                         latent.vars = NULL, min.cells.feature = 3, min.cells.group = 3,
+                                         pseudocount.use = 1, return.thresh = 0.01)
+
+mouse_cncc_marker_genes <- mutate(mouse_cncc_marker_genes,pct.diff=pct.1-pct.2)
+mouse_cncc_marker_genes$mo_gene <- annotLookup_ortho_one2one$input_gene[match(mouse_cncc_marker_genes$gene,rownames(annotLookup_ortho_one2one))]
+# openxlsx::write.xlsx(mouse_cncc_marker_genes,"Craniofacial-scRNAseqManuscript/final-tables/Mouse_SigGenes_cncc_SubTypes.xlsx")
+mouse_cncc_marker_genes <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/Mouse_CNCC_SigGenes_subtype_final.xlsx")
+
+top100_mouse_cncc_marker_genes <- mouse_cncc_marker_genes %>% filter(p_val_adj<0.05)%>%  group_by(cluster) %>% top_n(100, avg_log2FC) %>% split(.$cluster) %>% lapply(function(df) df$gene)
+
+
+```
+
+GeneOverlap for CNCC subtypes
+
+```{r}
+
+gs.markers= length(intersect(rownames(annotLookup_ortho_one2one),cncc_marker_genes$gene))
+
+names(top100_human_cncc_marker_genes) <- paste0("human ",names(top100_human_cncc_marker_genes))
+names(top100_mouse_cncc_marker_genes) <- paste0("mouse ",names(top100_mouse_cncc_marker_genes))
+gom.obj <- newGOM(top100_human_cncc_marker_genes, top100_mouse_cncc_marker_genes, gs.markers)
+
+cncc_geneoverlap_pval <- getMatrix(gom.obj,name = "pval")
+cncc_geneoverlap_odds <- getMatrix(gom.obj,name = "odds.ratio")
+formatted_values <- t(apply(cncc_geneoverlap_pval,1,function(x) ifelse(as.numeric(x) > 0.05, "NS", sprintf("%.2e", x))))
+
+
+p <- pheatmap(
+  mat = cncc_geneoverlap_odds[-which(rowSds(cncc_geneoverlap_odds)==0),],
+  cluster_cols = T,
+  cluster_rows = T,
+  display_numbers = formatted_values[-which(rowSds(cncc_geneoverlap_odds)==0),],
+  scale="row",
+  fontsize_row = 13,
+  fontsize_col = 13,fontsize = 12,
+  number_color="white",angle_col = 45,
+  color = viridis(n = 50, option = "C", direction = -1),
+  main = "Top 100 DEGs: Human vs. Mouse CNCC Subtypes",
+)
+
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))
+p
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human Subtypes", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/CNCC_GeneOverlap_human_mouse_subtype_final_top100DEGs_heatmap.pdf",width=15,height=8.5)
+
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))
+p
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 16)) # X-axis title
+grid.text("Human Subtypes", x = -0.02, rot = 90, gp = gpar(fontsize = 16)) # Y-axis title
+
+drawHeatmap(gom.obj, grid.col="Reds",note.col="white")
+dev.off()
+```
+
+```{r}
+cncc_subtype_intersect <- getNestedList(gom.obj, name="intersection")
+
+cncc_subtype_intersect_longer <- map_df(names(cncc_subtype_intersect), function(mouse_cond) {
+  human_cells <- names(cncc_subtype_intersect[[mouse_cond]])
+  genes <- unlist(cncc_subtype_intersect[[mouse_cond]])
+  
+  tibble(
+    mouse_celltype = rep(mouse_cond, length(genes)),
+    human_celltype = rep(human_cells, sapply(cncc_subtype_intersect[[mouse_cond]], length)),
+    gene = genes
+  )
+})
+
+
+human_mouse_shared_cncc <- cncc_subtype_intersect_longer %>%
+  group_by(mouse_celltype, human_celltype) %>%
+  dplyr::summarize(shared_gene_count = n(), .groups = "drop")
+
+human_mouse_shared_cncc <- as.data.frame(human_mouse_shared_cncc)
+human_mouse_shared_cncc$pval <- rep(NA,nrow(human_mouse_shared_cncc))
+for (i in 1:nrow(human_mouse_shared_cncc)){
+  human_mouse_shared_cncc$pval[i] <- cncc_geneoverlap_pval[which(rownames(cncc_geneoverlap_pval)==human_mouse_shared_cncc$human_celltype[i]),which(colnames(cncc_geneoverlap_pval)==human_mouse_shared_cncc$mouse_celltype[i])]
+}
+
+human_mouse_shared_cncc$pval <- as.numeric(human_mouse_shared_cncc$pval)
+human_mouse_shared_cncc$sig <- human_mouse_shared_cncc$pval
+human_mouse_shared_cncc$sig[which(human_mouse_shared_cncc$pval>0.05)] <- ""
+human_mouse_shared_cncc$sig[which(human_mouse_shared_cncc$pval<0.05 & 
+                                   human_mouse_shared_cncc$pval>0.001)] <- "*"
+human_mouse_shared_cncc$sig[which(human_mouse_shared_cncc$pval<0.001 & 
+                                   human_mouse_shared_cncc$pval>0.0001)] <- "**"
+human_mouse_shared_cncc$sig[which(human_mouse_shared_cncc$pval<0.0001)] <- "***"
+
+human_mouse_shared_cncc$pval_format <- ifelse(as.numeric(human_mouse_shared_cncc$pval) > 0.05, "NS", sprintf("%.2e", human_mouse_shared_cncc$pval))
+
+
+cncc_colors_alluvial <- cncc_colors
+names(cncc_colors_alluvial) <- paste0("human ",names(cncc_colors_alluvial))
+
+p <- ggplot(human_mouse_shared_cncc[which(human_mouse_shared_cncc$shared_gene_count>=5),],
+            aes(axis1 = mouse_celltype, axis2 = human_celltype,
+                y = shared_gene_count,label=pval_format)) +  
+  geom_alluvium(aes(fill = human_celltype), width = 0.2, alpha = 0.8) +
+  geom_stratum(aes(fill = human_celltype)) +
+  geom_text(stat = "stratum", aes(label = after_stat(stratum))) +
+  geom_text(stat = "flow", nudge_x = 0.2,size=3,hjust=-0.05) +
+  scale_fill_manual(values = cncc_colors_alluvial, na.value = NA) + 
+  theme_minimal() +
+  labs(title = "Gene Overlap Between Mouse & Human Ectoderm Subtypes",
+       y="") +
+  NoLegend() +
+   theme(panel.grid.major = element_blank(), 
+         panel.grid.minor = element_blank(),
+         plot.title = element_text(hjust=0.5),
+         axis.text.x = element_blank(),
+         axis.text.y = element_blank())
+
+p
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Human_Mouse_CNCC_Subtypes_>5geneoverlap_AlluvialPlot.pdf",width=11,height=10)
+p
+dev.off()
+```
+
+plotting SAMap results
+```{r}
+MappingTable <- read.table("/scr1/users/manchela/Data/Multiome/Humanface/GEX/SAMap/SAMapOutput_MappingTable_human-mouse_cncc_27Mar.txt", sep = '\t',header = 1,row.names = 1)
+MappingTable <-as.matrix(MappingTable[grep("mo",rownames(MappingTable)),grep("hu",colnames(MappingTable))])
+
+human.celltype.match <- data.frame(x=colnames(MappingTable),y=strsplit2(colnames(MappingTable),split="_")[,2])
+mouse.celltype.match <- data.frame(x=rownames(MappingTable),y=strsplit2(rownames(MappingTable),split="_")[,2])
+
+
+cncc_annot_table <- as.data.frame(cbind(as.numeric(cncc$RNA_snn_res.1)-1,as.character(cncc$subtype_final)))
+cncc_annot_table <- cncc_annot_table[-which(duplicated(cncc_annot_table)),]
+
+cncc_annot_table_mouse <- as.data.frame(cbind(as.numeric(mcncc1$RNA_snn_res.1)-1,as.character(mcncc1$subtype_final)))
+cncc_annot_table_mouse <- cncc_annot_table_mouse[-which(duplicated(cncc_annot_table_mouse)),]
+
+colnames(MappingTable) <- paste0("human ", cncc_annot_table$V2[match(human.celltype.match$y,cncc_annot_table$V1)])
+
+rownames(MappingTable) <-paste0("mouse ",cncc_annot_table_mouse$V2[match(mouse.celltype.match$y,cncc_annot_table_mouse$V1)])
+
+
+MappingTable <- t(MappingTable)
+p2 <- pheatmap(MappingTable,display_numbers = round(MappingTable,2),scale="row", main="SAMap - SOX2-_SOX10+ Mouse vs. Human",angle_col = "45",color = viridis(n = 50, option = "C", direction = -1),number_color = "white",fontsize_number = 12)
+
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))  # Reduce plot size to create margins
+p2
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human Subtypes", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/CNCC_SAMap_human_mouse_subtype_final_heatmap.pdf",width=15,height=8.5)
+
+grid.newpage()
+pushViewport(viewport(width = 0.9, height = 0.9))  # Reduce plot size to create margins
+p2
+grid.text("Mouse Subtypes", y = -0.02, gp = gpar(fontsize = 12)) # X-axis title
+grid.text("Human Subtypes", x = -0.02, rot = 90, gp = gpar(fontsize = 12)) # Y-axis title
+
+dev.off()
+```
+
+
+
+Performing functional annotation for mouse CNCC subtypes
+
+```{r}
+
+mouse_cncc_marker_genes <- openxlsx::read.xlsx("Mouse_CNCC_SigGenes_subtype_final.xlsx")
+
+mart <-  useMart("ENSEMBL_MART_ENSEMBL") #, host = "https://useast.ensembl.org")
+mart <- useDataset("hsapiens_gene_ensembl", mart)
+
+cncc_annotLookup <- getBM(
+  mart = mart,
+  attributes = c(
+    "hgnc_symbol","description",
+    "entrezgene_id",
+    "gene_biotype"),
+  filter = "hgnc_symbol",
+  values = rownames(mcncc1),
+  uniqueRows=TRUE)
+
+mouse_cncc_marker_genes$Entrez <- cncc_annotLookup$entrezgene_id[match(mouse_cncc_marker_genes$gene,cncc_annotLookup$hgnc_symbol)]
+mouse_cncc_marker_genes <- mouse_cncc_marker_genes[-which(is.na(mouse_cncc_marker_genes$Entrez)),]
+
+mcncc1$subtype_final <- factor(mcncc1$subtype_final)
+Idents(mcncc1) <- mcncc1$subtype_final
+
+top_cncc <- mouse_cncc_marker_genes %>% 
+  mutate(cluster = factor(cluster, levels = levels(mcncc1$subtype_final))) %>% 
+  group_by(cluster) %>% top_n(5, avg_log2FC) %>% arrange(cluster)
+
+top100_cncc <- mouse_cncc_marker_genes %>% filter(p_val_adj < 0.05)  %>% group_by(cluster) %>% top_n(100, avg_log2FC)
+top100pval_cncc <- subset(top100_cncc, rowSums(top100_cncc[5] < 0.05) > 0)
+
+top50_cncc <- mouse_cncc_marker_genes %>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% top_n(50, avg_log2FC)
+top50pval_cncc <- subset(top50_cncc, rowSums(top50_cncc[5] < 0.05) > 0)
+
+df1 <- top100pval_cncc[,c(6,9)]
+df1$cluster <- factor(df1$cluster,levels=levels(mcncc1$subtype_final))
+df1sample <- split(df1$Entrez,df1$cluster)
+length(df1sample)
+initial_types <- names(df1sample)
+
+genelist <- as.list(df1sample)
+background_genes <- unique(mouse_cncc_marker_genes$Entrez)
+
+BPclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'BP', universe = background_genes)
+BPclusterplot <- pairwise_termsim(BPclusterplot)
+
+CCclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'CC', universe = background_genes)
+CCclusterplot <- pairwise_termsim(CCclusterplot)
+
+MFclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichGO", OrgDb = "org.Hs.eg.db", pvalueCutoff=0.05, pAdjustMethod = "BH",  ont = 'MF', universe = background_genes)
+MFclusterplot <- pairwise_termsim(MFclusterplot)
+
+Pathwayclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichPathway", pvalueCutoff=0.05, pAdjustMethod = "BH", universe = background_genes)
+Pathwayclusterplot <- pairwise_termsim(Pathwayclusterplot)
+
+KEGGclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichKEGG", pvalueCutoff=0.05, pAdjustMethod = "BH", universe = background_genes)
+KEGGclusterplot <- pairwise_termsim(KEGGclusterplot)
+
+DOclusterplot <- compareCluster(geneCluster = genelist, fun = "enrichDGN", pvalueCutoff=0.05, pAdjustMethod = "BH", universe = background_genes)
+DOclusterplot <- pairwise_termsim(DOclusterplot)
+
+
+options(enrichplot.colours = c("blue", "grey"))
+p1 <- dotplot(BPclusterplot, showCategory = 5, font.size = 6, title = "GO: Biological Process", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1))
+options(enrichplot.colours = c("orange", "grey"))
+p2 <- dotplot(CCclusterplot, showCategory = 5, font.size = 6, title = "GO: Cellular Component", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1))
+options(enrichplot.colours = c("green", "grey"))
+p3 <- dotplot(MFclusterplot, showCategory = 5, font.size = 6, title = "GO: Molecular Function", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1))
+options(enrichplot.colours = c("brown", "grey"))
+p4 <- dotplot(Pathwayclusterplot, showCategory = 5, font.size = 6, title = "Reactome Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1))
+options(enrichplot.colours = c("yellow", "grey"))
+p5 <- dotplot(KEGGclusterplot, showCategory = 5, font.size = 6, title = "KEGG Pathway", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1))
+options(enrichplot.colours = c("red", "grey"))
+p6 <- dotplot(DOclusterplot, showCategory = 5, font.size = 6, title = "DisGeNet", color = "p.adjust", label_format = 50) + theme( legend.text=element_text(size=5),legend.position = "right",legend.box = "vertical",text = element_text(size=6), plot.title = element_text(hjust= 0.5, size = 12),axis.text.x = element_text(angle = 45, hjust = 1))
+
+p1
+p2
+p3
+p4
+p5
+p6
+
+```
+
+```{r}
+mouse_cncc_annot_list <- list(BP =BPclusterplot, CC=CCclusterplot, MF = MFclusterplot, Reactome=Pathwayclusterplot,
+                          KEGG=KEGGclusterplot, DisGeNet=DOclusterplot)
+saveRDS(mouse_cncc_annot_list, "human_face_mouse_cncc_subtype_final_functional-annotation_lists_27Mar.rds")
+
+mouse_cncc_annot_list <- readRDS("human_face_mouse_cncc_subtype_final_functional-annotation_lists_27Mar.rds")
+mouse_cncc_annot_list$BP <- mouse_cncc_annot_list$BP@compareClusterResult
+mouse_cncc_annot_list$CC <- mouse_cncc_annot_list$CC@compareClusterResult
+mouse_cncc_annot_list$MF <- mouse_cncc_annot_list$MF@compareClusterResult
+mouse_cncc_annot_list$Reactome <- mouse_cncc_annot_list$Reactome@compareClusterResult
+mouse_cncc_annot_list$KEGG <- mouse_cncc_annot_list$KEGG@compareClusterResult
+mouse_cncc_annot_list$DisGeNet <- mouse_cncc_annot_list$DisGeNet@compareClusterResult
+openxlsx::write.xlsx(mouse_cncc_annot_list, file = "Craniofacial-scRNAseqManuscript/final-tables/mouse_cncc_subtype_final_functional-annotation.xlsx",
+                     sheetName = names(mouse_cncc_annot_list), rowNames = FALSE)
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/CNCC_mouse_subtype_final_Top10_FunctionalEnrichment_dotplot.pdf",width=13,height=16)
+p1
+p2
+p3
+p4
+p5
+p6
+dev.off()
+```
+
+```{r}
+pdf(file = "Craniofacial-scRNAseqManuscript/final-figs/CNCC_mouse_subtype_final_Top5_FunctionalEnrichment_dotplot.pdf", w = 17, h = 22)
+cowplot::plot_grid(p1, p2, p3, p4, p5, p6, ncol=2, labels=LETTERS[1:6])
+dev.off()
+```
+
+top mouse cncc markers
+```{r}
+sig_genes_mcncc_subtypes <- openxlsx::read.xlsx("Craniofacial-scRNAseqManuscript/final-tables/Mouse_CNCC_SigGenes_subtype_final.xlsx")
+sig_genes_mcncc_subtypes$ensemblID <- annotLookup$ensembl_gene_id[match(sig_genes_mcncc_subtypes$gene,annotLookup$hgnc_symbol)]
+sig_genes_mcncc_subtypes$biotype <- annotLookup$gene_biotype[match(sig_genes_mcncc_subtypes$gene,annotLookup$hgnc_symbol)]
+
+sig_genes_mcncc_subtypes$TF <- "No"
+sig_genes_mcncc_subtypes$TF[which(sig_genes_mcncc_subtypes$ensemblID%in%tf_table$Human_TF)] <- "Yes"
+
+sig_genes_mcncc_subtypes_protein <- sig_genes_mcncc_subtypes %>% filter(biotype == "protein_coding",TF=="Yes",p_val_adj<0.05)
+
+mcncc$subtype_final <- factor(mcncc$subtype_final)
+
+top_celtype <- sig_genes_mcncc_subtypes_protein %>% 
+  mutate(cluster = factor(cluster, levels = levels(mcncc$subtype_final))) %>% 
+  group_by(cluster) %>% top_n(5, avg_log2FC) %>% arrange(cluster)
+
+top100_celltype <- sig_genes_mcncc_subtypes_protein %>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% top_n(100, avg_log2FC)
+top100pval_celltype <- subset(top100_celltype, rowSums(top100_celltype[5] < 0.05) > 0)
+
+top50_celltype <- sig_genes_mcncc_subtypes_protein%>% filter(p_val_adj < 0.05) %>% group_by(cluster) %>% top_n(50, avg_log2FC)
+top50pval_celltype <- subset(top50_celltype, rowSums(top50_celltype[5] < 0.05) > 0)
+```
+
+```{r}
+sig_genes_mcncc_subtypes_protein <- sig_genes_mcncc_subtypes_protein[order(sig_genes_mcncc_subtypes_protein$cluster),]
+
+top_initial_mcncc_subtype <- sig_genes_mcncc_subtypes_protein %>% group_by(cluster) %>% top_n(5, avg_log2FC)
+
+Idents(mcncc1) <- factor(mcncc1$subtype_final,levels=sort(as.character(unique(mcncc1$subtype_final))))
+  p <- DotPlot(object = mcncc1, features = unique(top_initial_mcncc_subtype$gene))+ coord_flip()+ RotatedAxis()
+df <- data.frame(Gene = p$data$features.plot, avg.exp = p$data$avg.exp.scaled, pct.exp = p$data$pct.exp, cluster = p$data$id)
+
+out <- DotPlot_scCustom(seurat_object = mcncc1, features = unique(top_initial_mcncc_subtype$gene), colors_use = viridis_plasma_dark_high,flip_axes=T,
+                         remove_axis_titles = T,x_lab_rotate = T) + 
+    theme(axis.text.x = element_text(size = 10),axis.text.y = element_text(size = 6, face = "italic"), legend.position = "bottom",legend.justification = "center", legend.title = element_text(size = 10, hjust=0.5),legend.text = element_text(size = 10))+guides(color = guide_colorbar(title.position = "top",title = "Average Expression"),size = guide_legend(title.position = "top",title = "Percent Expressed")) 
+
+out
+
+```
+
+```{r}
+pdf("Craniofacial-scRNAseqManuscript/final-figs/Mouse_cncc_subtype_final_TF_markergenes_dotplot.pdf",width=10,height=14)
+out
+dev.off()
+
+```
